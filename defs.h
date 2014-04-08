@@ -8,7 +8,7 @@
 #define WE 2.0 // must be < XDIM and it doesnt work if we<2??--> too big force, the lower limit is determined by tau2, which should be <1e-1! If size of lattice is increased, lower limit for We increases!
 
 /* lattice size */
-#define XDIM 60
+#define XDIM 50
 #define YDIM XDIM
 
 /* number of iterations */
