@@ -230,7 +230,7 @@ void init(){
 					y < sqCentY + (int)(sqSide * .5)){
 				node[YDIM*x+y].rho=RHO_MEAN + ran2(&seed) * (RHO_HIGH-RHO_MEAN);
 			} else {
-				node[YDIM*x+y].rho=RHO_LOW + ran2(&seed) * (RHO_HIGH-RHO_MEAN)
+				node[YDIM*x+y].rho=RHO_LOW + ran2(&seed) * (RHO_HIGH-RHO_MEAN);
 			}
 			
 			node[YDIM*x+y].u[0]=ux=0.0;//UAMP*sin(y*2.0*M_PI*N/(YDIM));
