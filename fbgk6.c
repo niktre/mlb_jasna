@@ -1,20 +1,14 @@
-/*2D multiphase BGK Lattice Boltzmann code 
-v2.2: interface force with new ansatz - 
-v3.0: include correction terms of order epsilon
-v4.0: include other correction terms
-v5.0: include implicit algorith for velocity calculation
-v6.0: include correct equation of state
-*/
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include "defs.h"
 
+double cs2_eq;
+
 double tau[TDIM]={TAU1, TAU1, TAU1, TAU1,TAU2, TAU2, TAU2, TAU2, TAU3, TAU3, TAU3, TAU3};
 
-Velocity vel[VDIM];
+//Velocity vel[VDIM];
 
 int D[DIM*TDIM]={
 		 1,  0,
@@ -66,18 +60,15 @@ double eq_state(double rho){
 		integral = 0.0;
 	}
 	else if(R1 < rho && rho <= R2){
-//		integral = (rho-R1)* (rho-R1)* R0 *0.5/(R2-R1);
 		integral = (rho-R1) * (rho-R1) / (R2-R1);
 	}
 	else if(R2 < rho && rho<= R3){
-//		integral = (R0/2.0) * (- (R3-rho) * (R3-rho) / (R3-R2) + (R3-R2) + (R2-R1));
 		integral = (rho - R2) * (2. - (rho - R2) / (R3 - R2)) + (R2 - R1);
 	}
 	else if(R3 < rho && rho<= R4){
 		integral = R3 - R1 - (rho - R3) * (rho - R3) / (R4 - R3);
 	}
 	else if(R4 < rho && rho <= R5){
-//		integral = (R0/2.0) * ( (rho-R5) * (rho-R5) / (R5-R4) - (R5-R4) - (R3-R4)*(R3-R4)/(R3-R2) + (R3-R2) + (R2-R1));
 		integral = 2. * R3 - R1 - R4 - (rho - R4) * (2. - (rho - R4) / (R5 - R4));
 	} else {
 		printf ("I've lost myself in the EOS!\n");
@@ -91,23 +82,7 @@ return sigma;
 /**Derivative of sigma_2 with respect to density*/
 double derS(double rho){
 	double der;
-/*
-	if((rho <= R1) || (rho > R5) ){
-		der = 0.0;
-	}
-	else if(R1 < rho && rho <= R2){
-		der = eq_state(rho) * R0 * (rho-R1) / (R2-R1); 
-	}
-	else if(R2 < rho && rho<= R4){
-		der = eq_state(rho) * R0 * (R3-rho) / (R3-R2);
-	}
-	else if(R4 < rho && rho <= R5){
-		der = eq_state(rho) * R0 * (rho-R5) / (R5-R4);
-	} else {
-		printf ("Something is wrong with the derS\n");
-		exit (0);
-	}
- */
+
 	if((rho <= R1) || (rho > R5) ){
 		der = 0.0;
 	}
@@ -134,23 +109,7 @@ return der;
 /**Second derivative of sigma_2 with respect to density*/
 double der2S(double rho){
 	double der;
-/*
-	if((rho <= R1) || (rho > R5) ){
-		der = 0.0;
-	}
-	else if(R1 < rho && rho <= R2){
-		der = derS(rho) * R0 * (rho-R1) / (R2-R1) + eq_state(rho) * R0 / (R2-R1);
-	}
-	else if(R2 < rho && rho<= R4){
-		der =  derS(rho) * R0 * (R3-rho) / (R3-R2) - eq_state(rho) * R0 / (R3-R2);
-	}
-	else if(R4 < rho && rho <= R5){
-		der =  derS(rho) * R0 * (rho-R5) / (R5-R4) + eq_state(rho) * R0 / (R5-R4);
-	} else {
-		printf ("Something is wrong with the der2S\n");
-		exit (0);
-	}
-*/
+	
 	if((rho <= R1) || (rho > R5) ){
 		der = 0.0;
 	}
@@ -171,8 +130,6 @@ double der2S(double rho){
 	}
 return der;
 }
-
-
 
 /******************************************************/
 /**Derivative of p with respect to density*/
@@ -203,7 +160,6 @@ double der2P(double rho){
 return der;
 }
 
-
 /***********************************************************/
 /**Calculate c_s^2 and weights as a function of density*/
 void weights(int pos){
@@ -217,17 +173,11 @@ void weights(int pos){
 		
 	/**set weights at each node*/
 	node[pos].w[0]= 1. - sigma_2 * 45. * 0.5 * (7./60. - 7./48. * sigma_2 + sigma_2 * sigma_2 / 16.);
-				//printf("w00=%e\n",node[pos].w[0]);
 	node[pos].w[1]= sigma_2 / 3. * (32./15. - 4. * sigma_2 + 2. * sigma_2 * sigma_2);
-				//printf("w01=%e\n",node[pos].w[1]);
 	node[pos].w[5]= sigma_2 * sigma_2 * (1./3. - 0.25 * sigma_2);
-				//printf("w05=%e\n",node[pos].w[5]);
 	node[pos].w[9]= sigma_2 * (-1./18. + 3./16. * sigma_2 - sigma_2 * sigma_2 / 12.);
-				//printf("w09=%e\n",node[pos].w[9]);
 	node[pos].w[13]= sigma_2 * sigma_2 / 96. * (-0.5 + 1.5 * sigma_2);
-				//printf("w13=%e\n",node[pos].w[13]);
 	node[pos].w[17]= sigma_2 / 384. * (4./15. - sigma_2 + sigma_2 * sigma_2);
-				//printf("w17=%e\n\n",node[pos].w[17]);
 
 	for(i=1;i<4;i++){
 		node[pos].w[1+i]=node[pos].w[1];
@@ -237,13 +187,6 @@ void weights(int pos){
 		node[pos].w[17+i]=node[pos].w[17];
 	}
 
-/*	double check=0.0;
-	for(i=0;i<VDIM;i++){
-		check+=node[pos].w[i];
-		if(node[pos].w[i]<0.0){printf("ERROR WEIGHTS < 0 %e\n",node[pos].w[i]);exit(0);}
-	}
-	if(check-1.0>1e-10){printf("ERROR WEIGHTS != 1 %e\n",check);exit(0);}
-*/	//node[pos].S*=A*A/(H*H);
 return;
 }
 
@@ -253,11 +196,12 @@ void density(int pos){
 	int v;
 	double density=0.0;
 	for(v=0;v<VDIM;v++){
-		density += vel[v].n[pos];	
+		density += node[pos].pop[v];
 	} 
 	node[pos].rho=density;
 //if(density<0.5 || density>1.4 ){printf("pos=%d rho=%e\n",pos,density); for(v=0;v<VDIM;v++){printf("node[%d].n=%e\n",v,vel[v].n[pos]);} exit(0);}
-return;
+	
+	return;
 }
 //
 
@@ -269,32 +213,10 @@ void init(){
 	int x,y,v,i;
 	long int seed=-15789138;
 	double ux, uy, uxx, uyy, uxy, usq,r;
-	FILE *velocity;
+	FILE *velFile;
 	for(x=0;x<XDIM;x++){
-		//chx+=1;if(chx==limit)chx=-limit;
 		r=ran2(&seed);
 		for(y=0;y<YDIM;y++){
-
-			/*1D two stripes condition*/
-/*			if(x>XDIM/2){
-				node[YDIM*x+y].rho=RHO_HIGH;//+0.5*(r-0.5);//+AMP*exp(-(pow(x-XDIM/2.0,2)+pow(y-YDIM/2.0,2))/WIDTH);
-			}
-			else if(x<=XDIM/2){
-				node[YDIM*x+y].rho=RHO_LOW;
-			}
-*/
-			/*1D random stripes*/
-/*			if(r<0.5){
-				node[YDIM*x+y].rho=RHO_MEAN+0.01;
-			}
-			else
-				node[YDIM*x+y].rho=RHO_MEAN-0.01;
-*/
-		 	/*2D random initial condition*/
-//			node[YDIM*x+y].rho=RHO_MEAN+(ran2(&seed)-0.5)*(RHO_HIGH - RHO_MEAN);
-			
-			/*2D uniform density */
-//			node[YDIM*x+y].rho=RHO_MEAN;
 			
 			/*2D small square initial condition*/
 			int sqSide;
@@ -302,21 +224,20 @@ void init(){
 			int sqCentX, sqCentY;
 			sqCentX = (int) (0.45*XDIM);
 			sqCentY = (int) (0.45*YDIM);
-			if (x >= sqCentX - (int)(sqSide * .5) && 
-				x < sqCentX + (int)(sqSide * .5) &&
-				y >= sqCentY - (int)(sqSide * .5) &&
-				y < sqCentY + (int)(sqSide * .5)){
+			if (x >= sqCentX - (int)(sqSide * .5) &&
+					x < sqCentX + (int)(sqSide * .5) &&
+					y >= sqCentY - (int)(sqSide * .5) &&
+					y < sqCentY + (int)(sqSide * .5)){
 				node[YDIM*x+y].rho=RHO_MEAN + ran2(&seed) * (RHO_HIGH-RHO_MEAN);
 			} else {
-//				node[YDIM*x+y].rho=RHO_MEAN - ran2(&seed) * (RHO_MEAN-RHO_LOW);
-				node[YDIM*x+y].rho=RHO_LOW;// - ran2(&seed) * (RHO_MEAN-RHO_LOW);
+				node[YDIM*x+y].rho=RHO_LOW + ran2(&seed) * (RHO_HIGH-RHO_MEAN)
 			}
 			
 			node[YDIM*x+y].u[0]=ux=0.0;//UAMP*sin(y*2.0*M_PI*N/(YDIM));
-			node[YDIM*x+y].u[1]=uy=0.0;	
+			node[YDIM*x+y].u[1]=uy=0.0;
 			
 			weights(YDIM*x+y);
-
+			
 			/**calculate equilibrium distributions at each node*/
 			uxx=ux*ux;
 			uyy=uy*uy;
@@ -324,21 +245,21 @@ void init(){
 			usq=uxx+uyy;
 			
 			for(v=0;v<VDIM;v++){
-				vel[v].n[YDIM*x+y] =node[YDIM*x+y].w[v]*node[YDIM*x+y].rho;//*(1.0+ (ux*C[2*v]+uy*C[2*v+1])/(node[YDIM*x+y].S) + (ux*C[2*v]+uy*C[2*v+1])*(ux*C[2*v]+uy*C[2*v+1])/(2.0*node[YDIM*x+y].S*node[YDIM*x+y].S) - usq/(2*node[YDIM*x+y].S));		
-
+				node[YDIM*x+y].pop[v] = node[YDIM*x+y].w[v]*node[YDIM*x+y].rho;
 			}
-
+			
 		}      
 	}
 
-		velocity = fopen("velocity_init","w");
-			for(x=0;x<XDIM;x++)
-				for(y=0;y<YDIM;y++){ 
-					fprintf(velocity, "%-*d %-*d %-*f  %-*f \n", 5,x,5,y,10,node[YDIM*x+y].u[0],10,node[YDIM*x+y].u[1]);
-				}	
-		fclose(velocity);
+	velFile = fopen("velocity_init","w");
+	for(x=0;x<XDIM;x++) {
+		for(y=0;y<YDIM;y++){
+			fprintf(velFile, "%-*d %-*d %-*f  %-*f \n", 5,x,5,y,10,node[YDIM*x+y].u[0],10,node[YDIM*x+y].u[1]);
+		}
+	}
+	fclose(velFile);
 
-return;
+	return;
 }
 
 /**********************************************************/
@@ -352,12 +273,9 @@ void total_momentum(){
 		for(y=0;y<YDIM;y++){
 			pos=YDIM*x+y;
 			for(v=0;v<VDIM;v++){
-				Mx += (vel[v].n[pos]*C[2*v]);
-				My += (vel[v].n[pos]*C[2*v+1]);
-				M += vel[v].n[pos];
-//				if (pos < 200) printf ("v=%3d, pos=%4d, vel=%f\n", v, pos, vel[v].n[pos]);
-
-//				printf ("%d (%e, %e) tot Mass %e\n", v, Mx, My, M);
+				Mx += (node[pos].pop[v]*C[2*v]);
+				My += (node[pos].pop[v]*C[2*v+1]);
+				M += node[pos].pop[v];
 			}
 			Mx += (H*node[pos].Fx/2.0);
 			Mx -= (der_g_pi1minus(0,x,y)/12.0);  //!!! ce dodamo ta clen je momentum pri 2D random init ful velik
@@ -379,26 +297,34 @@ void interface_force(){
 
 	for(x=0;x<XDIM;x++){
 		for(y=0;y<YDIM;y++){
+			node[pos].Fx = 0.;
+			node[pos].Fy = 0.;
+		}
+	}
+	
+	for(x=0;x<XDIM;x++){
+		for(y=0;y<YDIM;y++){
 			pos=YDIM*x+y;
 			Fx=0.0; Fy=0.0;
 			for(t=0;t<TDIM;t++){
-			//	check+=tau[t]*D[2*t]*D[2*t]*D[2*t]*D[2*t]; 
+			//	check+=tau[t]*D[2*t]*D[2*t]*D[2*t]*D[2*t];
+				
 				xnew=x+D[2*t];
 				ynew=y+D[2*t+1];
-				if (xnew > XDIM - 1) xnew -= XDIM;
+				if (xnew >= XDIM) xnew -= XDIM;
 				if (xnew < 0)	xnew += XDIM;
-				if (ynew > YDIM-1 ) ynew -= YDIM;
+				if (ynew >= YDIM) ynew -= YDIM;
 				if (ynew < 0)	ynew += YDIM;
-				/* formula 70, page 9*/
+				
+				/* formula 70, page 9 - Nikita: does not correspond to the paper anymore.
+				 Probably, it should be page 9, Eq. 67 */
 				Fx += tau[t] * D[2*t]   * node[YDIM * xnew + ynew].rho;
 				Fy += tau[t] * D[2*t+1] * node[YDIM * xnew + ynew].rho;
 			}
-//			Fx *= 2.0 * node[YDIM * x + y].rho / (GAMMA+1.0);
-//			Fy *= 2.0 * node[YDIM * x + y].rho / (GAMMA+1.0);
-			Fx *= KAPPA / (A*A*A);
-			Fy *= KAPPA / (A*A*A);
-			node[pos].Fx = Fx;
-			node[pos].Fy = Fy;
+			Fx *= KAPPA * node[YDIM * xnew + ynew].rho / (A*A*A);
+			Fy *= KAPPA * node[YDIM * xnew + ynew].rho / (A*A*A);
+			node[pos].Fx += Fx;
+			node[pos].Fy += Fy;
 		}
 	}
 return;
@@ -406,14 +332,13 @@ return;
 
 /********************************************************/
 /**Delta function*/
-
 double delta(int a, int b){
-	if(a==b)return 1.0;
+	if (a == b) return 1.0;
 	else return 0.0;
 }
 
 /******************************************************/
-/** $\partial_\g (\pi_{\a\g}^{*(1)} - \pi_{\a\g}^{(1)})$ */
+/** $\partial_\g (\pi_{\a\g}^{*(1)} - \pi_{\a\g}^{(1)})$. Nikita: probably, Appendix C.1. */
 double der_g_pi1minus(int a, int x, int y){
 	double der=0.0,derv1,derv2;
 	double rho;
@@ -424,25 +349,22 @@ double der_g_pi1minus(int a, int x, int y){
 	if(a==0) whata = UX; else if (a==1) whata = UY;
 	for(g=0;g<DIM;g++){
 		if(g==0) whatg = UX; else if (g==1) whatg = UY;
-		der += ((der1(PRESSURE,x,y,g) * (der1(whatg,x,y,a) + der1(whata,x,y,g))+
+		der += ((der1v2(PRESSURE,x,y,g) * (der1v2(whatg,x,y,a) + der1v2(whata,x,y,g))+
 			rho*node[YDIM*x+y].S *der12(whatg,x,y,a,g)) );
 		der -= (derS(rho) * rho * rho *  der12(whatg,x,y,a,g));
 
 	}
 	der += (rho * node[YDIM*x+y].S * der22(whata,x,y)); 
 //	derv1 = (rho * der2P(rho) * der1(DENSITY,x,y,a) * (der1(UX,x,y,0)+der1(UY,x,y,1))); //derv1 in derv2 bi mogla dat isti rezultat pa ga ne
-	derv2 = (rho *  der1(DERP,x,y,a) * (der1(UX,x,y,0)+der1(UY,x,y,1)));
+	derv2 = (rho *  der1v2(DERP,x,y,a) * (der1v2(UX,x,y,0)+der1v2(UY,x,y,1)));
 
-/*check*/
-//	if(derv1-derv2>1e-10) printf("derv1=%e	derv2=%e\n",derv1, derv2);
-/*end check*/
 	der-=derv2;
 	
 return der;
 }
 
 /*******************************************************/
-/**$\partial_\g (\pi_{\a\g}^{(0)})$*/
+/**$\partial_\g (\pi_{\a\g}^{(0)})$. Nikita: probably, Appendix C.4.*/
 double der_g_pi0(int a, int x, int y){
 	double der=0.0;
 	double rho;
@@ -453,10 +375,10 @@ double der_g_pi0(int a, int x, int y){
 	uy=node[YDIM*x+y].u[1];
 
 	if(a==0){
-		der = der1(PRESSURE,x,y,a) + der1(RHOUXUX,x,y,0) + der1(RHOUXUY,x,y,1);
+		der = der1v2(PRESSURE,x,y,a) + der1v2(RHOUXUX,x,y,0) + der1v2(RHOUXUY,x,y,1);
 	}
 	else if (a==1){
-		der = der1(PRESSURE,x,y,a) + der1(RHOUXUY,x,y,0) + der1(RHOUYUY,x,y,1);
+		der = der1v2(PRESSURE,x,y,a) + der1v2(RHOUXUY,x,y,0) + der1v2(RHOUYUY,x,y,1);
 	}
 
 return der;
@@ -464,36 +386,31 @@ return der;
 
 
 /******************************************************/
-/**$\partial_{\b\g} \pi_{\a\g}^{(0)}$*/
+/**$\partial_{\b\g} \pi_{\a\g}^{(0)}$. Nikita: no idea so far */
 double der_b_g_pi0(int a, int x, int y, int b){
 	double der=0.0;
 	double rho;
 	rho = node[YDIM*x+y].rho;
 	DerivativeOf what;
-	
 
-//	if(a!=b){
 		if(a==0)
 			der =  der12(PRESSURE,x,y,a,b) + der12(RHOUXUX,x,y,0,b) + der12(RHOUXUY,x,y,1,b);
 		else if(a==1)
 			der = der12(PRESSURE,x,y,a,b) + der12(RHOUXUY,x,y,0,b) + der12(RHOUYUY,x,y,1,b);
-//	}
-//	if(a==b){
-//		der =   der2P(rho) * der1(DENSITY,x,y,a) * der1(DENSITY,x,y,a) +  derP(rho) * der22(DENSITY,x,y) + der12(RHOUXUX,x,y,0,0) + der12(RHOUYUY,x,y,1,1) + 2.0 * der12(RHOUXUY,x,y,0,1);
-//	}
+
 return der;
 }
 
 /********************************************************/
-/**$\partial_{\a}(frac{u_{\b}}{\rho})$*/
+/**$\partial_{\a}(frac{u_{\b}}{\rho})$ Nikita: no idea so far */
 double der_u_rho(int b, int x, int y, int a){
 	double der=0.0;
 	double invRho;
 	invRho = 1./node[YDIM*x+y].rho;
 	if (b == 0){
-		der = der1(UX,x,y,a) * invRho - node[YDIM*x+y].u[b] * der1(DENSITY,x,y,a) * invRho * invRho;
+		der = der1v2(UX,x,y,a) * invRho - node[YDIM*x+y].u[b] * der1v2(DENSITY,x,y,a) * invRho * invRho;
 	} else if (b == 1){
-		der = der1(UY,x,y,a) * invRho - node[YDIM*x+y].u[b] * der1(DENSITY,x,y,a) * invRho * invRho;
+		der = der1v2(UY,x,y,a) * invRho - node[YDIM*x+y].u[b] * der1v2(DENSITY,x,y,a) * invRho * invRho;
 	} else {
 	}
 
@@ -519,19 +436,14 @@ double correction_ksi(int a, int b, int g, int x, int y){
 		else if (b1==1 && g1==1) what=PUYUY;
 		else if ((b1==1 && g1==0)||(b1==0 && g1==1)) what=PUXUY;
 
-		Xi+= der1(what,x,y,a1);
+		Xi+= der1v2(what,x,y,a1);
 		if(b1==g1){
-			Xi+= (rho*node[YDIM*x+y].S * der1(SIGMA,x,y,a1) + rho*rho*derS(rho)*node[YDIM*x+y].u[a1] *
-											 (der1(UX,x,y,0)+der1(UY,x,y,1)));
+			Xi+= (rho*node[YDIM*x+y].S * der1v2(SIGMA,x,y,a1) + rho*rho*derS(rho)*node[YDIM*x+y].u[a1] *
+											 (der1v2(UX,x,y,0)+der1v2(UY,x,y,1)));
 		}
 	}
 	Xi*=((GAMMA*GAMMA+4.0*GAMMA+1.0)/(3.0*(GAMMA+1.0)));
 
-//if(der1(SIGMA,x,y,0)-derS(rho)*der1(DENSITY,x,y,0)>1e-10){printf("%e\n",der1(SIGMA,x,y,0)-derS(rho)*der1(DENSITY,x,y,0));}
-
-
-//	if(b==g)
-//	Xi+=(3.0*(GAMMA-1.0)*node[YDIM*x+y].S* der_g_pi1minus(a,x,y)/12.0);
 return Xi;
 }
 
@@ -548,8 +460,7 @@ double correction_sigma(int a, int b, int x, int y){
 	Sigma3=0.0;
 	Sigma4=0.0;
 	Sigma5=0.0;
-//	if (a==0){ whata=UX; whata0=RHOUXUX; whata1=RHOUXUY;} else if (a==1){ whata=UY; whata0=RHOUXUY; whata1=RHOUYUY;}
-//	if (b==0){ whatb=UX; whatb0=RHOUXUX; whatb1=RHOUXUY;} else if (b==1){ whatb=UY; whatb0=RHOUXUY; whatb1=RHOUYUY;}
+
 	if (a==0) whata=UX;  else if (a==1)whata=UY;
 	if (b==0) whatb=UX;  else if (b==1)whatb=UY;
 
@@ -560,73 +471,30 @@ double correction_sigma(int a, int b, int x, int y){
 	Sigma1= ((1.0+GAMMA)*(1.0+GAMMA)/(4.0*(1.0-GAMMA)))* (node[YDIM*x+y].u[a]*der_g_pi1minus(b,x,y) + node[YDIM*x+y].u[b]*der_g_pi1minus(a,x,y));   //first line  $\part_{t_2} \pi_{\a\b}^{(0)}$
 
 	//second line
-	Sigma2= (der1(JX,x,y,0) + der1(JY,x,y,1)) * (- derP(rho) * (der1(whatb,x,y,a) + der1(whata,x,y,b)) + delta(a,b) * der2P(rho) * rho * (der1(UX, x,y,0) + der1(UY, x,y,1))); //second line
+	Sigma2= (der1v2(JX,x,y,0) + der1v2(JY,x,y,1)) * (- derP(rho) * (der1v2(whatb,x,y,a) + der1v2(whata,x,y,b)) + delta(a,b) * der2P(rho) * rho * (der1v2(UX, x,y,0) + der1v2(UY, x,y,1))); //second line
 
 	//third line
-	Sigma3= der1(DENSITY, x, y, a) *der_g_pi0(b,x,y) / (rho) - der_b_g_pi0(b,x,y,a) 
-		+der1(DENSITY, x, y, b) *der_g_pi0(a,x,y) / (rho) - der_b_g_pi0(a,x,y,b); 
+	Sigma3= der1v2(DENSITY, x, y, a) *der_g_pi0(b,x,y) / (rho) - der_b_g_pi0(b,x,y,a)
+		+der1v2(DENSITY, x, y, b) *der_g_pi0(a,x,y) / (rho) - der_b_g_pi0(a,x,y,b);
 	Sigma3*= S;
 
 	//fourth line
-	Sigma4= (der1(JX,x,y,0) + der1(JY,x,y,1)) * (der_u_rho(b,x,y,a) + der_u_rho(a,x,y,b)) 
+	Sigma4= (der1v2(JX,x,y,0) + der1v2(JY,x,y,1)) * (der_u_rho(b,x,y,a) + der_u_rho(a,x,y,b))
 		+ node[YDIM*x+y].u[b] * (der12(JX,x,y,a,0) +der12(JY,x,y,a,1))/(rho) +  node[YDIM*x+y].u[a] * (der12(JX,x,y,b,0) +der12(JY,x,y,b,1))/(rho);
 
 	Sigma4*= (S*rho);
 
 	//fifth line
 	if(a==b){
-		Sigma5= (der1(DENSITY,x,y,0) * der_g_pi0(0,x,y) + der1(DENSITY,x,y,1) * der_g_pi0(1,x,y))/(rho*rho)
+		Sigma5= (der1v2(DENSITY,x,y,0) * der_g_pi0(0,x,y) + der1v2(DENSITY,x,y,1) * der_g_pi0(1,x,y))/(rho*rho)
 			- (der_b_g_pi0(0,x,y,0) +der_b_g_pi0(1,x,y,1))/(rho)
-			+ (der_u_rho(0,x,y,0) + der_u_rho(1,x,y,1)) * (der1(JX,x,y,0) + der1(JY,x,y,1)) 
+			+ (der_u_rho(0,x,y,0) + der_u_rho(1,x,y,1)) * (der1v2(JX,x,y,0) + der1v2(JY,x,y,1))
 			+ (node[YDIM*x+y].u[0] * (der12(JX,x,y,0,0) + der12(JY,x,y,0,1)) + node[YDIM*x+y].u[1] *  (der12(JX,x,y,0,1) + der12(JY,x,y,1,1)))/(rho);
 
 		Sigma5*= (S*rho - derP(rho) * rho);
 	}
 	Sigma=Sigma1 + (Sigma2 +Sigma3+Sigma4+Sigma5)*(GAMMA*GAMMA + 4.0*GAMMA +1.0)/(6.0*(GAMMA - 1.0));
 
-/**checking*/
-	//3,4 line 1st term
-//	Sigma00= ((S/(rho)) * (der1(DENSITY,x,y,a) * (der1(PRESSURE,x,y,b) + der1(whatb0,x,y,0) + der1(whatb1,x,y,1))+ 
-//				der1(DENSITY,x,y,b) * (der1(PRESSURE,x,y,a) + der1(whata0,x,y,0) + der1(whata1,x,y,1))));
-
-//	Sigma00-= (S * (2.0 * der12(PRESSURE, x,y, a,b) + der12(whatb0,x,y,a,0) + der12(whatb1,x,y,a,1) +  
-//				der12(whata0,x,y,b,0) + der12(whata1,x,y,b,1)));  
-
-	//3,4 line 2nd term
-//	Sigma00+= ((der1(JX,x,y,0) + der1(JY,x,y,1)) * ((-1.)* (S/(rho)) * (der1(DENSITY, x,y,a) * node[YDIM*x+y].u[b] + der1(DENSITY,x,y,b) * node[YDIM*x+y].u[a])   + 
-//		     S * (der1(whatb, x,y,a) + der1(whata, x,y,b)))
-//		+ S * (node[YDIM*x+y].u[b] * (der12(JX,x,y,a,0) + der12(JY,x,y,a,1) ) +
-//			node[YDIM*x+y].u[a] * (der12(JX,x,y,b,0) + der12(JY,x,y,b,1) )));
-	
-/*	if(a==b){
-		for(a1=0;a1<2;a1++){
-			if (a1==0) {whata0=RHOUXUX; whata1=RHOUXUY;} else if (a1==1) {whata0=RHOUXUY; whata1=RHOUYUY;}
-		
-			//3,4 line 1st term
-			Sigma00+= (derS(rho) * ((-1.0) * (der1(DENSITY,x,y,a1) * (der1(PRESSURE,x,y,a1) + der1(whata0,x,y,0) + der1(whata1,x,y,1))) +	 (rho) * (der12(whata0, x,y,a1,0) + der12(whata1, x,y,a1,1) ))); //5 line 1st term				
-		
-			//3,4 line 2nd term
-			Sigma00+= ((der1(JX,x,y,0) + der1(JY,x,y,1)) * derS(rho) * der1(DENSITY, x,y,a1) * node[YDIM*x+y].u[a1]) ;//5 line 2nd term
-			Sigma00-= (derS(rho) * rho * (node[YDIM*x+y].u[a1] * (der12(JX,x,y,a1,0) + der12(JY,x,y,a1,1)) )); //5 line 2nd term
-		}
-	
-		
-		//3,4 line 2nd term
-		Sigma00-= (derS(rho) * rho * (der1(UX, x,y,0) + der1(UY, x,y,1)) * (der1(JX,x,y,0) + der1(JY,x,y,1)));//5 line 2nd term
-
-		
-		//3,4 line 1st term
-		Sigma00+= (derS(rho)* rho * der22(PRESSURE,x,y));	//5 line 1st term	 
-	}
-*/	
-//	Sigma00+=Sigma2;
-//PREFACTOR!!!!
-//	Sigma00*=((GAMMA*GAMMA+4.0*GAMMA+1.0)/(6.0*(GAMMA-1.0))); //if(abs(Sigma1)>0.1)printf("Sigma=%e, Sigma1=%e\n",Sigma,Sigma1);
-//	Sigma0=Sigma00+Sigma1+Sigma3;
-
-//	if(fabs(Sigma3-Sigma00)>1e-3) {
-//		printf("Sigma %e Sigma0 %e \n",Sigma3, Sigma00);exit(0);}
-/*end of checking*/
 return Sigma;
 }
 
@@ -649,8 +517,8 @@ void velocity(int rep){
 			uy0[pos] = 0.0;
 
 			for(v=0;v<VDIM;v++){
-				ux0[pos] += (vel[v].n[pos]*C[2*v]);
-				uy0[pos] += (vel[v].n[pos]*C[2*v+1]);
+				ux0[pos] += (node[pos].pop[v]*C[2*v]);
+				uy0[pos] += (node[pos].pop[v]*C[2*v+1]);
 			}
 
 			ux0[pos] = (ux0[pos] + node[pos].Fx*0.5)/(node[pos].rho);
@@ -675,31 +543,17 @@ void velocity(int rep){
 				ux = ux0[YDIM*x+y] - (der_g_pi1minus(0,x,y)/(12.0 * node[YDIM*x+y].rho));
 				uy = uy0[YDIM*x+y] - (der_g_pi1minus(1,x,y)/(12.0 * node[YDIM*x+y].rho));
 				
-//			if(ux >=1 || uy >=1) printf("xy=%d,%d	ux=%f	uy=%f\n",x,y, ux, uy);
-				difference = fabs(node[YDIM*x+y].u[0]-ux); 
+				difference = fabs(node[YDIM*x+y].u[0]-ux);
 				if(difference > dif) dif=difference;
 				difference = fabs(node[YDIM*x+y].u[1]-uy);
 				if(difference > dif) dif=difference;
 			
 				node[YDIM*x+y].u[0]=ux;
 				node[YDIM*x+y].u[1]=uy;
-//printf("%-*d %-*e %-*e %-*e %-*e %-*e %-*e\n",5,count,15,node[YDIM*x+y].u[0],15,node[YDIM*x+y].u[1],15,ux,15,uy,15,ux0[YDIM*x+y],15,uy0[YDIM*x+y]);	
+
 			}
 		}
 	}
-
-/*	for(x=0;x<XDIM;x++){
-			for(y=0;y<YDIM;y++){
-				
-				if((fabs(ux0[pos])>0.5) || (fabs(uy0[pos])>0.5)){printf("ERR:velocity too big r=(%d,%d)    v=(%f,%f)\n",x,y,ux0[pos],uy0[pos]);exit(0);}
-				
-			
-		}
-	}
-*/
-//	printf("%d done in %d steps	dif=%e\n",rep,count,dif);
-//	if(dif==0){printf("DIF=0 !! %e %e %e %e\n",node[YDIM*x+y].u[0],node[YDIM*x+y].u[1],ux0,uy0 ); exit(0);}
-
 
 return;
 }
@@ -725,7 +579,6 @@ void collide(int rep, double *W){
 		for(y=0;y<YDIM;y++){
 			pos=YDIM*x+y;
 			density(pos);  
-//if(y==11 && (x==98 || x==99 || x==100 || x==101 || x==102)){printf("x=%d rho=%e \n",x, node[pos].rho);}
 			weights(pos);
 		}
 	}
@@ -736,86 +589,69 @@ void collide(int rep, double *W){
 	for(x=0;x<XDIM;x++){
 		for(y=0;y<YDIM;y++){
 			pos=YDIM*x+y;
-	//if(y==11 && (x==100 || x==101 ))printf("ux0=%e, rho=%e %e\n\n",ux0/r,r, node[YDIM*x+y].rho);
+			//if(y==11 && (x==100 || x==101 ))printf("ux0=%e, rho=%e %e\n\n",ux0/r,r, node[YDIM*x+y].rho);
 			ux=node[pos].u[0];
 			uy=node[pos].u[1];
-
-
-/*calculate interface collision operator delta_i[v]*/
+			
+			
+			/*calculate interface collision operator delta_i[v]*/
 			for(v=1;v<VDIM;v++){
 				check=0.0;
 				/* formula 71, page 9 */
-				delta_i[v]=((GAMMA+1.0)/(2.0*SIGMA2))*(C[2*v]*node[pos].Fx + C[2*v+1]*node[pos].Fy) * W[v];
-//if(delta_i[v]>1e-4)printf("v=%d	delta_i=%e	x=%d y=%d\n",v, delta_i[v],x,y );
-			} //printf("%d	%f	\n\n",v, delta_i[v]);
-		//printf("check=%e\n",check); 
-
-//printf("delta_i[%d]=%e\n", v, delta_i[v]);
-
-
+				delta_i[v]=((GAMMA+1.0)/(2.0*cs2_eq))*(C[2*v]*node[pos].Fx + C[2*v+1]*node[pos].Fy) * W[v];
+			}
 			
 			/*new density distributions - with interface force*/
 			ux0=0.0; fx0=0.0; r=0.0;
 			S=node[YDIM*x+y].S;
 			for(v=0;v<VDIM;v++){
 				/*calculate equilibrium distribution*/
-				n_v_eq=node[pos].w[v]*node[pos].rho*(1.0 + (ux*C[2*v]+uy*C[2*v+1])/(S) + 
-									(ux*C[2*v] + uy*C[2*v+1]) * (ux*C[2*v] + uy*C[2*v+1]) / (2.0*S*S) -
-									(ux*ux+uy*uy)/(2.0*S));
-//if(n_v_eq>0.5)printf("n_%d_eq=%f\n",v,n_v_eq);
-				/*new populations n* after collision: bgk + interface*/
-				vel[v].n[pos] = GAMMA*vel[v].n[pos] + (1.0-GAMMA)*n_v_eq + delta_i[v]; 
-//if(delta_i[v])printf("delta_i[%d]=%e\n",v,delta_i[v]);
-/*if((v==1 || v==2) && y==11 && ( x==102 || x==101 || x==100 ||x==99 || x==98 || x==97)){printf("n_v_%d=%e	eq_n= %e	delta=%e	(%d,%d)\n ",v,vel[v].n[YDIM*x+y],n_v_eq , delta_i[v],	x,y); }
-if( y==11 && ( x==102 || x==101 || x==100 ||x==99 || x==98 || x==97)){
-	ux0 += (vel[v].n[YDIM*x+y]*C[2*v]);
-	fx0+=(delta_i[v]*C[2*v]*2.0/(GAMMA+1.0));
-	r+=n_v_eq;}*/
-			}//if( y==11 && (x==99 || x==100 || x==101 || x==102 || x==98 || x==97))printf("ux0=%e %e fx0=%e rho=%e %e\n\n",ux/r,(ux0+0.5*fx0)/r, fx0, r, node[YDIM*x+y].rho);
+				n_v_eq = node[pos].w[v] * node[pos].rho * (1.0 + (1. / S) * (ux*C[2*v]+uy*C[2*v+1]) +
+																								 0.5 * (ux*C[2*v] + uy*C[2*v+1]) * (ux*C[2*v] + uy*C[2*v+1]) / S -
+																								 0.5 * (ux*ux+uy*uy));
+
+				node[pos].pop[v] = GAMMA*node[pos].pop[v] + (1.0-GAMMA)*n_v_eq + delta_i[v];
+			}
 		}
 	}
 	/*calculate correction collision operator of first order*/
 
-	S=SIGMA2;//node[YDIM*x+y].S;
+	S=cs2_eq;//node[YDIM*x+y].S;
 	for(x=0;x<XDIM;x++){
 		for(y=0;y<YDIM;y++){
 			for(v=0;v<VDIM;v++){
 				delta_c1=0.0;
 				for(a=0;a<DIM;a++){
-				for(b=0;b<DIM;b++){
-				for(g=0;g<DIM;g++){
-				delta_c1 += (correction_ksi(a,b,g,x,y)*(C[2*v+a]*C[2*v+b]*C[2*v+g] - S*(delta(a,b)*C[2*v+g] + delta(a,g)*C[2*v+b] + delta(b,g)*C[2*v+a]) ));			
-				}}}
+					for(b=0;b<DIM;b++){
+						for(g=0;g<DIM;g++){
+							delta_c1 += (correction_ksi(a,b,g,x,y)*(C[2*v+a]*C[2*v+b]*C[2*v+g] - S*(delta(a,b)*C[2*v+g] + delta(a,g)*C[2*v+b] + delta(b,g)*C[2*v+a]) ));
+						}
+					}
+				}
 				delta_c1 *= (W[v]/(6.0*S*S*S));
-				vel[v].n[YDIM*x+y] += delta_c1;
-
-//if(delta_c1>1e-1)printf("v=%d	delta_c1=%e	x=%d y=%d\n",v, delta_c1,x,y );
-
-//if((vel[v].n[YDIM*x+y]<0.0) ){printf("ERRc1 (%d,%d) rep=%d vel[%d]=%e vel.n_before_c1=%e c_1=%e rho=%f\n",x,y,rep,v,vel[v].n[YDIM*x+y], vel[v].n[YDIM*x+y]-delta_c1,delta_c1,node[YDIM*x+y].rho); }
-//if((delta_c1)>1e-5)printf("xy(%d,%d) delta_c1[%d]=%e\n\n",x,y,v,delta_c1);
-
-//if(y==10 && (x==50 && rep%50==0) && (v==1) ) 
-//if(x==10 && (y==25 ) && (v==3)) 
-//printf("xy(%d,%d) delta_c1[%d]=%e     rho=%e    F=(%e,%e)   ni=%e   U=(%e,%e) \n",x,y,v,delta_c1,node[YDIM*x+y].rho , node[YDIM*x+y].Fx,node[YDIM*x+y].Fy ,vel[v].n[YDIM*x+y] ,node[YDIM*x+y].u[0],node[YDIM*x+y].u[1] );
-
+				node[YDIM*x+y].pop[v] += delta_c1;
 			}
-//printf("%f %f\n",node[YDIM*x+y].rho, derS(node[YDIM*x+y].rho));
+			//printf("%f %f\n",node[YDIM*x+y].rho, derS(node[YDIM*x+y].rho));
 		}
-check=0;
-for(v=0;v<VDIM;v++){
-if(vel[v].n[YDIM*x+1] <0.0){check=1;} break;}
-if(check==1){for(v=0;v<VDIM;v++){
-		printf("(%d,%d)    v=%d,    n=%e      rho=%f\n",x,1,v,vel[v].n[YDIM*x+1],node[YDIM*x+1].rho  );}
-	exit(0);
-}
+		check=0;
+		for(v=0;v<VDIM;v++){
+			if(node[YDIM*x+1].pop[v] < 0.0) {
+				check=1;
+			} break;
+		}
+
+		if(check==1) {
+			for(v=0;v<VDIM;v++){
+				printf("(%d,%d)    v=%d,    n=%e      rho=%f\n",x,1,v,node[YDIM*x+1].pop[v],node[YDIM*x+1].rho  );
+			}
+			exit(0);
+		}
 	}
 
-
 	/*calculate correction collision operator of second order*/
-
 	for(x=0;x<XDIM;x++){
 		for(y=0;y<YDIM;y++){
-			S=SIGMA2;//node[YDIM*x+y].S;
+			S=cs2_eq;//node[YDIM*x+y].S;
 			for(v=0;v<VDIM;v++){
 				delta_c2[v]=0.0;
 				delta_j2[v]=0.0;
@@ -825,35 +661,28 @@ if(check==1){for(v=0;v<VDIM;v++){
 					correction=correction_sigma(a,b,x,y);
 					for(v=0;v<VDIM;v++){
 						delta_c2[v]+=(correction*(C[2*v+a]*C[2*v+b] - S*(delta(a,b))));
-
+						
 					}
 				}
 			}
-
+			
 			for(a=0;a<DIM;a++){
 				correction=der_g_pi1minus(a,x,y);
 				for(v=0;v<VDIM;v++){
 					delta_j2[v]+=(correction * C[2*v+a]);
-				}			
+				}
 			}
-
+			
 			for(v=0;v<VDIM;v++){
 				delta_c2[v]*=(W[v]/(2.0*S*S));//printf("delta_c2[%d]=%e\n",v,delta_c2);
 				delta_j2[v]*=((1.0 - GAMMA)*W[v]/(S * 12.0)); //if(fabs(delta_j2)>0.5)printf("delta_j2[%d]=%e\n",v,delta_j2);
-		//	if(delta_c2[v]>1e-1)printf("v=%d	delta_c2=%e	x=%d y=%d\n",v, delta_c2[v],x,y );
-
-				vel[v].n[YDIM*x+y]+=(delta_c2[v] + delta_j2[v]); //!!! ce dodamo j2 je pri 2D random init ful velik momentum
+				//	if(delta_c2[v]>1e-1)printf("v=%d	delta_c2=%e	x=%d y=%d\n",v, delta_c2[v],x,y );
+				
+				node[YDIM*x+y].pop[v] += (delta_c2[v] + delta_j2[v]); //!!! ce dodamo j2 je pri 2D random init ful velik momentum
 			}
-//if(vel[v].n[YDIM*x+y]<0.0)printf("xy(%d,%d) delta_c2[%d]=%e n=%e\n",x,y,v,delta_c2,vel[v].n[YDIM*x+y] );
-//if(fabs(delta_c2)>0.1)printf("delta_c2[%d]=%e\n\n",v,delta_c2);
-//if((vel[v].n[YDIM*x+y]<0.0) && x<10 && y==0 && rep==0){printf("ERRc2 (%d,%d) rep=%d vel[%d]=%e vel.n_before_c2=%e c_2=%e rho=%f\n",x,y,rep,v,vel[v].n[YDIM*x+y], vel[v].n[YDIM*x+y]-delta_c2,delta_c2,node[YDIM*x+y].rho); }
-
-			
 		}
 	}
-
-
-return;
+	return;
 }
 
 /**********************************************************/
@@ -869,12 +698,14 @@ int main(){
 	double W[VDIM];
 	double test;
 
-	W[0]=(1.0-SIGMA2*45.0*0.5*(7.0/60.0 - SIGMA2 * 7.0/48.0 +  SIGMA2 *  SIGMA2/16.0));
-	W[1]=SIGMA2/3.0 *(32.0/15.0 - 4.0*SIGMA2 +2.0*SIGMA2 * SIGMA2);
-	W[5]=SIGMA2 * SIGMA2 * (1.0/3.0 - SIGMA2/4.0);
-	W[9]=SIGMA2 * (-1.0/18.0 + (3.0/16.0) * SIGMA2 - SIGMA2 * SIGMA2/12.0 );
-	W[13]=(SIGMA2 * SIGMA2/96.0) * (-0.5 + 1.5 * SIGMA2);
-	W[17]=(SIGMA2 /384.0) * (4.0/15.0 - SIGMA2 + SIGMA2 * SIGMA2);
+	cs2_eq = eq_state(RHO_MEAN);
+	
+	W[0]=(1.0-cs2_eq*45.0*0.5*(7.0/60.0 - cs2_eq * 7.0/48.0 +  cs2_eq *  cs2_eq/16.0));
+	W[1]=cs2_eq/3.0 *(32.0/15.0 - 4.0*cs2_eq +2.0*cs2_eq * cs2_eq);
+	W[5]=cs2_eq * cs2_eq * (1.0/3.0 - cs2_eq/4.0);
+	W[9]=cs2_eq * (-1.0/18.0 + (3.0/16.0) * cs2_eq - cs2_eq * cs2_eq/12.0 );
+	W[13]=(cs2_eq * cs2_eq/96.0) * (-0.5 + 1.5 * cs2_eq);
+	W[17]=(cs2_eq /384.0) * (4.0/15.0 - cs2_eq + cs2_eq * cs2_eq);
 	for(i=1;i<4;i++){
 		W[1+i]=W[1];
 		W[5+i]=W[5];
@@ -882,14 +713,12 @@ int main(){
 		W[13+i]=W[13];
 		W[17+i]=W[17];
 	}
-	printf("sigma2=%f\n",eq_state(1.3));
+	printf("cs2_eq=%f\n",eq_state(RHO_MEAN));
 
-	printf("parameters are:\n RE=%f\n MU_LB=%f\n WE=%f\n KAPPA_LB=%f\n AA=%e\n HH=%e\n GAMMA=%f\n TAU2=%e\n MU_SIM=%f\n SIGMA2=%f\n",RE,KK/(RE*AA),WE,KAPPA,AA,HH,GAMMA,TAU2, (1+GAMMA)*RHO_MEAN*SIGMA2/(2*(1-GAMMA)),SIGMA2);
-	//printf("%f %f\n",5.824*RHO_HIGH-8.6272*RHO_HIGH*RHO_HIGH+3.408*RHO_HIGH*RHO_HIGH*RHO_HIGH,5.824*RHO_LOW-8.6272*RHO_LOW*RHO_LOW+3.408*RHO_LOW*RHO_LOW*RHO_LOW);
+	printf("parameters are:\n KAPPA_LB=%f\n GAMMA=%f\n TAU2=%e\n MU_SIM=%f\n cs2_eq=%f\n",KAPPA,GAMMA,TAU2, (1+GAMMA)*RHO_MEAN*cs2_eq/(2*(1-GAMMA)),cs2_eq);
 
 	state = fopen("output/eq_state","w");
 	for(di=0.01;di<2.0;di+=0.001)
-	//	fprintf(state, "%-*f %-*f  %-*f %-*f  %-*f %-*f  %-*f \n", 5,di,5, eq_state(di),5, 1.0/(di), 5, eq_state2(1.0/(di)),5,di,5,derS(di), 5,derP(di)/eq_state(di));
 	fprintf(state, "%-*f %-*f  %-*f  %-*f  %-*f  %-*f  %-*f  \n", 5,di,5, eq_state(di),5, derS(di), 5, der2S(di), 5, di*eq_state(di), 5, derP(di), 5, der2P(di));
 	fclose(state);
 
@@ -897,29 +726,21 @@ int main(){
 	printf ("FINISHED init!\n");
 	for(rep=0;rep<REP;rep++){
 		collide(rep,W);
-		//collide_no_force(rep);
-		stream();	
-//		printf ("FINISHED collide and stream!\n");
-		
-				
-	
+		stream();
+
 		if(rep%10==0){
 			printf("%d	",rep);
 			total_momentum();
 
 			sprintf(filename, "output/density%d",rep);
 			density = fopen(filename,"w");
-			//density2=fopen("testdensity","w");
 			for(y=0;y<XDIM;y++){
-				//fprintf(density2,"\n");
 				fprintf(density,"\n");
 				for(x=0;x<YDIM;x++){ 
 					fprintf(density, "%-*f", 10,node[YDIM*x+y].rho);
-		//			fprintf(density2, "%-*d %-*d %-*f\n", 10,x,10,y,10,node[YDIM*x+y].rho);
 				}
 			}
 			fclose(density);
-			//fclose(density2);
 
 			sprintf(filename, "output/pressure%d",rep);
 			pressure = fopen(filename,"w");
@@ -969,23 +790,9 @@ int main(){
 				fprintf(forceX,"\n");
 				fprintf(forceY,"\n");
 				for(x=0;x<YDIM;x++){ 
-					Fx=0.0; Fy=0.0; 
 					Fx=node[YDIM*x+y].Fx;
 					Fy=node[YDIM*x+y].Fy;
-					/*for(t=0;t<TDIM;t++){
-						xnew=x+D[2*t];
-						ynew=y+D[2*t+1];
-						if(xnew>(XDIM-1))xnew-=XDIM;
-						if(xnew<0)xnew+=XDIM;
-						if(ynew>(YDIM-1))ynew-=YDIM;
-						if(ynew<0)ynew+=YDIM;
-						Fx+=(tau[t]*D[2*t]*node[YDIM*xnew+ynew].rho);
-						Fy+=(tau[t]*D[2*t+1]*node[YDIM*xnew+ynew].rho);
-					}
-					Fx*=(2.0*node[YDIM*x+y].rho/(GAMMA+1.0));
-					Fy*=(2.0*node[YDIM*x+y].rho/(GAMMA+1.0));
-*/
-					
+				
 					fprintf(forceY, "%-*f", 10,Fy);
 					fprintf(forceX, "%-*f", 10,Fx);
 				}	
@@ -995,9 +802,5 @@ int main(){
 		}
 	}
 
-
-
 return 0;
 }
-
-

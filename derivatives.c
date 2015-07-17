@@ -6,7 +6,7 @@
 
 /*********************************************************/
 /**first derivative of f at x,y*/
-double der1(DerivativeOf what, int x, int y, int direction){
+/*double der1(DerivativeOf what, int x, int y, int direction){
 	double der_f;
 	double fm1,fm2,fp1,fp2; //fm1=function at position minus 1, fp2=function at position plus 2
 	int xm1, xp1, xm2, xp2, ym1, yp1, ym2, yp2;
@@ -19,14 +19,14 @@ double der1(DerivativeOf what, int x, int y, int direction){
 		xp2=x+2;
 		yp1=yp2=ym1=ym2=y;		
 
-		if (xm1>(XDIM-1)) xm1-=XDIM;
-		else if (xm1<0) xm1+=XDIM;
-		if (xm2>(XDIM-1)) xm2-=XDIM;
-		else if (xm2<0) xm2+=XDIM;
-		if (xp1>(XDIM-1)) xp1-=XDIM;
-		else if(xp1<0)xp1+=XDIM;
-		if (xp2>(XDIM-1)) xp2-=XDIM;
-		else if (xp2<0) xp2+=XDIM;
+		if (xm1 >= XDIM) xm1-=XDIM;
+		if (xm1 < 0) xm1+=XDIM;
+		if (xm2 >= XDIM) xm2-=XDIM;
+		if (xm2 < 0) xm2+=XDIM;
+		if (xp1 >= XDIM) xp1-=XDIM;
+		if (xp1 < 0) xp1+=XDIM;
+		if (xp2 >= XDIM) xp2-=XDIM;
+		if (xp2 < 0) xp2+=XDIM;
 	}
 	else if(direction==1){
 		ym1=y-1;
@@ -35,34 +35,34 @@ double der1(DerivativeOf what, int x, int y, int direction){
 		yp2=y+2;
 		xp1=xp2=xm1=xm2=x;		
 
-		if(ym1>(YDIM-1))ym1-=YDIM;
-		else if(ym1<0)ym1+=YDIM;
-		if(ym2>(YDIM-1))ym2-=YDIM;
-		else if(ym2<0)ym2+=YDIM;
-		if(yp1>(YDIM-1))yp1-=YDIM;
-		else if(yp1<0)yp1+=YDIM;
-		if(yp2>(YDIM-1))yp2-=YDIM;
-		else if(yp2<0)yp2+=YDIM;
+		if (ym1 >= YDIM) ym1-=YDIM;
+		if (ym1 < 0) ym1+=YDIM;
+		if (ym2 >= YDIM) ym2-=YDIM;
+		if (ym2 < 0) ym2+=YDIM;
+		if (yp1 >= YDIM) yp1-=YDIM;
+		if (yp1 < 0) yp1+=YDIM;
+		if (yp2 >= YDIM) yp2-=YDIM;
+		if (yp2 < 0) yp2+=YDIM;
 	}
 
 	switch (what){
 		case DENSITY:
-			fm1=node[YDIM*xm1+ym1].rho;
-			fm2=node[YDIM*xm2+ym2].rho;
-			fp1=node[YDIM*xp1+yp1].rho;
-			fp2=node[YDIM*xp2+yp2].rho;
+			fm1 = node[YDIM*xm1+ym1].rho;
+			fm2 = node[YDIM*xm2+ym2].rho;
+			fp1 = node[YDIM*xp1+yp1].rho;
+			fp2 = node[YDIM*xp2+yp2].rho;
 			break;
 		case UX:
-			fm1=node[YDIM*xm1+ym1].u[0];
-			fm2=node[YDIM*xm2+ym2].u[0];
-			fp1=node[YDIM*xp1+yp1].u[0];
-			fp2=node[YDIM*xp2+yp2].u[0];
+			fm1 = node[YDIM*xm1+ym1].u[0];
+			fm2 = node[YDIM*xm2+ym2].u[0];
+			fp1 = node[YDIM*xp1+yp1].u[0];
+			fp2 = node[YDIM*xp2+yp2].u[0];
 			break; 
 		case UY:
-			fm1=node[YDIM*xm1+ym1].u[1];
-			fm2=node[YDIM*xm2+ym2].u[1];
-			fp1=node[YDIM*xp1+yp1].u[1];
-			fp2=node[YDIM*xp2+yp2].u[1];
+			fm1 = node[YDIM*xm1+ym1].u[1];
+			fm2 = node[YDIM*xm2+ym2].u[1];
+			fp1 = node[YDIM*xp1+yp1].u[1];
+			fp2 = node[YDIM*xp2+yp2].u[1];
 			break; 
 		case PUXUX:
 			a=0; b=0;
@@ -138,10 +138,11 @@ double der1(DerivativeOf what, int x, int y, int direction){
 			break;
 
 	}
-	der_f = (8.0*fp1 - 8.0*fm1 - fp2 + fm2)/12.0;
+	der_f = 2./3. * (fp1-fm1) - 1./12. * (fp2 - fm2);
+//	der_f = (8.0*fp1 - 8.0*fm1 - fp2 + fm2)/12.0;
 return der_f;
 }
-
+*/
 
 /*********************************************************/
 /**first derivative of f at x,y higher accuracy*/
@@ -160,18 +161,18 @@ double der1v2(DerivativeOf what, int x, int y, int direction){
 		xm3=x-3;
 		yp1=yp2=ym1=ym2=ym3=yp3=y;		
 
-		if(xm1>(XDIM-1))xm1-=XDIM;
-		else if(xm1<0)xm1+=XDIM;
-		if(xm2>(XDIM-1))xm2-=XDIM;
-		else if(xm2<0)xm2+=XDIM;
-		if(xp1>(XDIM-1))xp1-=XDIM;
-		else if(xp1<0)xp1+=XDIM;
-		if(xp2>(XDIM-1))xp2-=XDIM;
-		else if(xp2<0)xp2+=XDIM;
-		if(xm3>(XDIM-1))xm3-=XDIM;
-		else if(xm3<0)xm3+=XDIM;
-		if(xp3>(XDIM-1))xp3-=XDIM;
-		else if(xp3<0)xp3+=XDIM;
+		if(xm1 >= XDIM) xm1 -= XDIM;
+		if(xm1 < 0) xm1 += XDIM;
+		if(xm2 >= XDIM) xm2 -= XDIM;
+		if(xm2 < 0) xm2 += XDIM;
+		if(xp1 >= XDIM) xp1 -= XDIM;
+		if(xp1 < 0) xp1 += XDIM;
+		if(xp2 >= XDIM) xp2 -= XDIM;
+		if(xp2 < 0) xp2 += XDIM;
+		if(xm3 >= XDIM) xm3 -= XDIM;
+		if(xm3 < 0) xm3 += XDIM;
+		if(xp3 >= XDIM) xp3 -= XDIM;
+		if(xp3 < 0) xp3 += XDIM;
 	}
 	else if(direction==1){
 		ym1=y-1;
@@ -182,18 +183,18 @@ double der1v2(DerivativeOf what, int x, int y, int direction){
 		ym3=y-3;
 		xp1=xp2=xm1=xm2=xm3=xp3=x;		
 
-		if(ym1>(YDIM-1))ym1-=YDIM;
-		else if(ym1<0)ym1+=YDIM;
-		if(ym2>(YDIM-1))ym2-=YDIM;
-		else if(ym2<0)ym2+=YDIM;
-		if(yp1>(YDIM-1))yp1-=YDIM;
-		else if(yp1<0)yp1+=YDIM;
-		if(yp2>(YDIM-1))yp2-=YDIM;
-		else if(yp2<0)yp2+=YDIM;
-		if(ym3>(YDIM-1))ym3-=YDIM;
-		else if(ym3<0)ym3+=YDIM;
-		if(yp3>(YDIM-1))yp3-=YDIM;
-		else if(yp3<0)yp3+=YDIM;
+		if (ym1 >= YDIM) ym1-=YDIM;
+		if (ym1 < 0) ym1+=YDIM;
+		if (ym2 >= YDIM) ym2-=YDIM;
+		if (ym2 < 0) ym2+=YDIM;
+		if (yp1 >= YDIM) yp1-=YDIM;
+		if (yp1 < 0) yp1+=YDIM;
+		if (yp2 >= YDIM) yp2-=YDIM;
+		if (yp2 < 0) yp2+=YDIM;
+		if (ym3 >= YDIM) ym3-=YDIM;
+		if (ym3 < 0) ym3+=YDIM;
+		if (yp3 >= YDIM) yp3-=YDIM;
+		if (yp3 < 0) yp3+=YDIM;
 	}
 		switch (what){
 		case DENSITY:

@@ -1,31 +1,12 @@
 #ifndef _DEFS_H
 #define _DEFS_H
 
-/*****************************************/
-/*PARAMETERS TO BE DETERMINED*/
-/* Reynolds and Weber numbers */
-#define RE 1.
-#define WE 2.0 // must be < XDIM and it doesnt work if we<2??--> too big force, the lower limit is determined by tau2, which should be <1e-1! If size of lattice is increased, lower limit for We increases!
-
 /* lattice size */
-#define XDIM 50
+#define XDIM 100
 #define YDIM XDIM
 
 /* number of iterations */
 #define REP 100000
-
-/*
- RE=1.000000
- MU_LB=0.500000
- WE=2.000000
- KAPPA_LB=0.0625001
- AA=2.000000e-02
- HH=2.000000e-04
- GAMMA=0.0641433
- TAU2=1.662723e-02
- MU_SIM=0.500000
- SIGMA2=0.676498
- */
 
 /*****************************************/
 /*PARAMETERS OF THE SYSTEM AND SIMULATION*/
@@ -50,18 +31,22 @@
 /* phase separation densities */
 #define RHO_LOW 1.13 //0.577348
 #define RHO_HIGH 1.47 //1.325965
-#define RHO_MEAN 1.3//(RHO_LOW+RHO_HIGH)/2.0
+#define RHO_MEAN (RHO_LOW+RHO_HIGH)/2.0
 
 /* time step: 1 because we do simulation in lattice units- viscosity and surface tension parameter kappa have to be rescaled accordingly! */
 #define H 1.0
 
 /* lattice size */
 #define A 1.0
+#define KAPPA 0.000001
 
-/* time step and lattice size used to convert constants from dimensionless to lattice units condition for small mach number: HH<<AA */
-#define KK 0.01
-#define AA (1.0/(XDIM)) //lattice
-#define HH (KK*AA)    //time
+#define GAMMA 0.
+#define OMEGA (1.0-GAMMA)
+
+/* Tau to determine interfacial force */
+#define TAU2 0.5
+#define TAU1 -2.0
+#define TAU3 0.25
 
 /* 2D velocity vectors (21) */
 extern double C[DIM*VDIM];
@@ -69,26 +54,9 @@ extern double C[DIM*VDIM];
 /* 2D velocity vectors (12) for interface force calculation */
 extern int D[DIM*TDIM];
 
-/* surface tension constant */
-#define KAPPA (KK*KK)/(AA*AA*WE*WE)		// 4e-6
-
 /* Initialization constants */
 #define AMP 1.0
 #define WIDTH 10
-
-/* SIGMA2=c_s^2 at mean density (rho=1.3) */
-#define SIGMA2 0.676498//(0.3*sin(RHO_MEAN*10.0)+0.8)//(A1*RHO_MEAN + A2*RHO_MEAN*RHO_MEAN + A3*RHO_MEAN*RHO_MEAN*RHO_MEAN)
-
-/* BGK collision operator constant OMEGA=1/tau, GAMMA has to be between -1 and 1 */
-#define CC (2.0*KK)/(RE*AA*RHO_MEAN*SIGMA2)
-#define GAMMA (CC-1.0)/(CC+1.0)
-#define OMEGA (1.0-GAMMA)
-
-/* weight tau for velocity set D */
-//#define TAU2 1.662723e-02
-#define TAU2 ((GAMMA+1.0)*KAPPA/4.0) //(GAMMA+1)*H*H*KAPPA/(4*A*A*A*A*SIGMA2)
-#define TAU1 (-4.0*TAU2)
-#define TAU3 (0.5*TAU2)
 
 /* weights tau */
 extern double tau[TDIM];
@@ -98,16 +66,16 @@ extern double tau[TDIM];
 #define UAMP 0.0
 #define N 1
 
-typedef struct
-{
-double rho;
-double u[DIM];
-double S;        /*\sigma_2 = S is any function of density rho*/
-double w[VDIM]; /*weights corresponding to the velocity vectors*/
-double Fx;
-double Fy;
+typedef struct {
+	double rho;
+	double u[DIM];
+	double S;        /*\sigma_2 = S is any function of density rho*/
+	double w[VDIM]; /*weights corresponding to the velocity vectors*/
+	double Fx;
+	double Fy;
+	double pop[VDIM];
 }Lattice;
-Lattice node[XDIM*YDIM];
+Lattice node[XDIM*YDIM], new_node[XDIM*YDIM], temp_node[XDIM*YDIM];
 
 typedef struct
 {
@@ -192,3 +160,46 @@ double delta(int a, int b); /**Delta function*/
 
 
 #endif
+
+
+/*****************************************/
+/*PARAMETERS TO BE DETERMINED*/
+/* Reynolds and Weber numbers */
+//#define RE 1.
+//#define WE 2.0 // must be < XDIM and it doesnt work if we<2??--> too big force, the lower limit is determined by tau2, which should be <1e-1! If size of lattice is increased, lower limit for We increases!
+
+/*
+ RE=1.000000
+ MU_LB=0.500000
+ WE=2.000000
+ KAPPA_LB=0.0625001
+ AA=2.000000e-02
+ HH=2.000000e-04
+ GAMMA=0.0641433
+ TAU2=1.662723e-02
+ MU_SIM=0.500000
+ SIGMA2=0.676498
+ */
+
+/* time step and lattice size used to convert constants from dimensionless to lattice units condition for small mach number: HH<<AA */
+//#define KK 0.01
+//#define AA (1.0/(XDIM)) //lattice
+//#define HH (KK*AA)    //time
+
+/* SIGMA2=c_s^2 at mean density (rho=1.3) */
+
+/* BGK collision operator constant OMEGA=1/tau, GAMMA has to be between -1 and 1 */
+//#define CC (2.0*KK)/(RE*AA*RHO_MEAN*SIGMA2)
+//#define GAMMA (CC-1.0)/(CC+1.0)
+
+//#define SIGMA2 0.676498//(0.3*sin(RHO_MEAN*10.0)+0.8)//(A1*RHO_MEAN + A2*RHO_MEAN*RHO_MEAN + A3*RHO_MEAN*RHO_MEAN*RHO_MEAN)
+
+/* surface tension constant */
+//#define KAPPA (KK*KK)/(AA*AA*WE*WE)		// 4e-6
+
+/* weight tau for velocity set D */
+//#define TAU2 1.662723e-02
+//#define TAU2 ((GAMMA+1.0)*KAPPA/4.0) //(GAMMA+1)*H*H*KAPPA/(4*A*A*A*A*SIGMA2)
+//#define TAU1 (-4.0*TAU2)
+//#define TAU3 (0.5*TAU2)
+
