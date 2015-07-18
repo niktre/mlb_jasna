@@ -338,3 +338,48 @@ double ran2(long *idum)
 #undef NDIV
 #undef EPS
 #undef RNMX
+
+/***********************************************************************/
+/* Added by uschille */
+/***********************************************************************/
+
+/** Generate Gaussian random numbers via Box-Muller transformation */
+double gaussian_random() {
+  static double x1, x2, r2, fac;
+  static int calc_new = 1;
+
+  /* On every second call two gaussian random numbers are calculated
+     via the Box-Muller transformation. One is returned as the result
+     and the second one is stored for use on the next call. */
+
+  /* Note: Use variable seeds for production runs! */
+
+  if (calc_new) {
+
+    calc_new = 0;
+
+    /* draw two uniform random numbers in the unit circle */
+    do {
+      x1 = 2.0*rand()/(double)RAND_MAX-1.0;
+      x2 = 2.0*rand()/(double)RAND_MAX-1.0;
+      r2 = x1*x1 + x2*x2;
+    } while (r2 >= 1.0);
+
+    /* perform Box-Muller transformation */
+    fac = sqrt(-2.0*log(r2)/r2);
+
+    /* return the first gaussian random number */
+    return x1*fac;
+
+  } else {
+
+    calc_new = 1;
+
+    /* return the stored gaussian random number */
+    return x2*fac;
+
+  }
+
+}
+
+/*********************************************************/
