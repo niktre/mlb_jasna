@@ -23,6 +23,7 @@
 #define NDIM 2
 #define NVEL 21
 #define HALO 4
+#define WGRID (2*HALO+1)
 
 /***********************************************************************/
 
@@ -37,10 +38,7 @@
 
 typedef struct _LBpar {
   double rho;
-  double viscosity;
-  double mu;
-  double grad_p;
-  double ext_force[NDIM];
+  double gamma;
 } LB_Parameters;
 
 typedef const struct _LBmodel {
