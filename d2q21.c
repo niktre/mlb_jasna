@@ -279,7 +279,7 @@ static void lb_init_fluid() {
   for (x=0; x<lblattice.halo_grid[0]; ++x) {
     for (y=0; y<lblattice.halo_grid[1]; ++y, m+=lbmodel.n_mom) {
       for (i=0; i<lbmodel.n_vel; ++i) {
-	m[i] = w[i]*lbpar.rho;
+        m[i] = w[i]*lbpar.rho;
       }
     }
   }
@@ -354,27 +354,26 @@ void lb_finalize() {
 /***********************************************************************/
 
 void write_profile() {
-  int x, y, z, zl, zh;  
-  double rho, j[3], *m;
+  int x, y, yl, yh;
+  double rho, j[NDIM], *m;
   FILE *file;
 
   x = lblattice.halo_grid[0]>>1;
-  y = lblattice.halo_grid[1]>>1;
+	
+  yl = lblattice.halo_size[1];
+  yh = lblattice.halo_size[1] + lblattice.grid[1];
 
-  zl = lblattice.halo_size[2];
-  zh = lblattice.grid[2]+lblattice.halo_size[2];
-
-  m = lbmom + lbmodel.n_mom*(lblattice.stride[0]*x+lblattice.stride[1]*y+zl);
+  m = lbmom + lbmodel.n_mom*(lblattice.stride[0]*x+yl);
 
   file = fopen("profile.dat","w");
-  for (z=zl; z<zh; ++z, m+=lbmodel.n_mom) {
+  for (y=yl; y<yh; ++y, m+=lbmodel.n_mom) {
     rho  = m[0] + lbpar.rho;
     if (rho > 0.0) {
       j[0] = m[1]/rho;
     } else {
       j[0] = 0.0;
     }
-    fprintf(file,"%f %f\n",(double)z,j[0]/rho);
+    fprintf(file,"%f %f %f\n",(double)y-yl,rho,j[0]/rho);
   }
   fclose(file);
 
@@ -389,7 +388,7 @@ int main(int argc, char *argv[]) {
   double start, finish, elapsed, mups;
 
   if (argc!=2) {
-    fprintf(stderr, "Usage: a.out <nsteps>\n");
+    fprintf(stderr, "Usage: ./run <nsteps>\n");
     return -1;
   }	   
 
