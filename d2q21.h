@@ -32,7 +32,7 @@
 #define NORMS(D,Q)   d##D##q##Q##_norms
 /* these macros are necessary to force prescan in the macro below */
 /* because prescan does not occur for stringify and concat */
-#define DnQm(D,Q)  { D, Q, Q, VELS(D,Q) } // WEIGHTS(D,Q), NORMS(D,Q) }
+#define DnQm(D,Q)  { D, Q, Q, VELS(D,Q) }
 
 /***********************************************************************/
 
@@ -46,8 +46,6 @@ typedef const struct _LBmodel {
   const int n_vel;
   const int n_mom;
   const double (*c)[NDIM];
-  const double *w;
-  const double *b;
 } LB_Model;
 
 typedef struct _Lattice {
@@ -83,3 +81,23 @@ static const double d2q21_velocities[21][2] = { {  0.,  0. },
 						{  0., -4. } };
 
 /***********************************************************************/
+
+void lb_weights(double *w, double sigma2) {
+  int i;
+
+  w[ 0] = 1.0 - 45./2.*sigma2*(7./60. - 7./48.*sigma2 + sigma2*sigma2/16.);
+  w[ 1] = sigma2/3.*(32./15. - 4.*sigma2 + 2.*sigma2*sigma2);
+  w[ 5] = sigma2*(sigma2/3. - sigma2*sigma2/4.);
+  w[ 9] = sigma2*(-1./18. + 3./16.*sigma2 - sigma2*sigma2/12.);
+  w[13] = sigma2/96.*(-sigma2/2. + 3./2.*sigma2*sigma2);
+  w[17] = sigma2/384.*(4./15. - sigma2 + sigma2*sigma2);
+
+  for(i=1; i<4; ++i) {
+    w[ 1+i] = w[1];
+    w[ 5+i] = w[5];
+    w[ 9+i] = w[9];
+    w[13+i] = w[13];
+    w[17+i] = w[17];
+  }
+
+}
