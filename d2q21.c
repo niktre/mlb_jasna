@@ -69,11 +69,13 @@ void lb_halo_copy() {
   memcpy(lbmom+ldst, lbmom+rsrc, size*sizeof(*lbmom));
   memcpy(lbmom+rdst, lbmom+lsrc, size*sizeof(*lbmom));
 
+  /* Y direction is handled directly in the update loop */
+
 }
 
 /***********************************************************************/
 
-static void lb_calc_equilibrium(double *m, double *f_eq) {
+static void lb_calc_equilibrium(double *f, double *f_eq) {
 
   const double *w = lbmodel.w;
   const double (*c)[lbmodel.n_dim] = lbmodel.c;
@@ -84,9 +86,9 @@ static void lb_calc_equilibrium(double *m, double *f_eq) {
 
   for (i=0; i<lbmodel.n_vel; ++i) {
     cs2  += w[i]*(c[i][0]*c[i][0]+c[i][1]*c[i][1]);
-    rho  += m[i];
-    j[0] += m[i]*lbmodel.c[i][0];
-    j[1] += m[i]*lbmodel.c[i][1];
+    rho  += f[i];
+    j[0] += f[i]*lbmodel.c[i][0];
+    j[1] += f[i]*lbmodel.c[i][1];
   }
 
   u[0] = j[0]/rho;
@@ -102,88 +104,88 @@ static void lb_calc_equilibrium(double *m, double *f_eq) {
 
 /***********************************************************************/
 
-static void lb_collisions(double *m) {
+static void lb_collisions(double *f) {
   
   int i;
   double f_eq[lbmodel.n_vel];
   
-  lb_calc_equilibrium(m, f_eq);
+  lb_calc_equilibrium(f, f_eq);
 
   for (i=0; i<lbmodel.n_vel; ++i) {
-    m[i] = f_eq[i] + lbpar.gamma * ( m[i] - f_eq[i] );
+    f[i] = f_eq[i] + lbpar.gamma * ( f[i] - f_eq[i] );
   }
   
 }
 
 /***********************************************************************/
 
-static void lb_stream(double *m, double PFI, int x, int y) {
+static void lb_stream(double *f, double PFI, int x, int y) {
   int xc, xp, xm, xp2, xm2, xp4, xm4;
-  xc = x%3;
-  xp  = (x+1)%WGRID; xm  = (x-1)%WGRID;
-  xp2 = (x+2)%WGRID; xm2 = (x-4)%WGRID;
-  xp4 = (x+4)%WGRID; xm4 = (x-4)%WGRID;
+  xc = x%WGRID;
+  xp  = (x+1)%WGRID; xm  = (x-1+WGRID)%WGRID;
+  xp2 = (x+2)%WGRID; xm2 = (x-2+WGRID)%WGRID;
+  xp4 = (x+4)%WGRID; xm4 = (x-4+WGRID)%WGRID;
 
-  FI( 0, xc )[y]   = m[0];
-  FI( 1, xp )[y]   = m[1];
-  FI( 2, xm )[y]   = m[2];
-  FI( 3, xc )[y+1] = m[3];
-  FI( 4, xc )[y-1] = m[4];
-  FI( 5, xp )[y+1] = m[5];
-  FI( 6, xm )[y-1] = m[6];
-  FI( 7, xm )[y+1] = m[7];
-  FI( 8, xp )[y-1] = m[8];
-  FI( 9, xp2)[y]   = m[9];
-  FI(10, xm2)[y]   = m[10];
-  FI(11, xc )[y+2] = m[11];
-  FI(12, xc )[y-2] = m[12];
-  FI(13, xp2)[y+2] = m[13];
-  FI(14, xm2)[y-2] = m[14];
-  FI(15, xm2)[y+2] = m[15];
-  FI(16, xp2)[y-2] = m[16];
-  FI(17, xp4)[y]   = m[17];
-  FI(18, xm4)[y]   = m[18];
-  FI(19, xc )[y+4] = m[19];
-  FI(20, xc )[y-4] = m[20];
+  FI( 0, xc )[y]   = f[0];
+  FI( 1, xp )[y]   = f[1];
+  FI( 2, xm )[y]   = f[2];
+  FI( 3, xc )[y+1] = f[3];
+  FI( 4, xc )[y-1] = f[4];
+  FI( 5, xp )[y+1] = f[5];
+  FI( 6, xm )[y-1] = f[6];
+  FI( 7, xm )[y+1] = f[7];
+  FI( 8, xp )[y-1] = f[8];
+  FI( 9, xp2)[y]   = f[9];
+  FI(10, xm2)[y]   = f[10];
+  FI(11, xc )[y+2] = f[11];
+  FI(12, xc )[y-2] = f[12];
+  FI(13, xp2)[y+2] = f[13];
+  FI(14, xm2)[y-2] = f[14];
+  FI(15, xm2)[y+2] = f[15];
+  FI(16, xp2)[y-2] = f[16];
+  FI(17, xp4)[y]   = f[17];
+  FI(18, xm4)[y]   = f[18];
+  FI(19, xc )[y+4] = f[19];
+  FI(20, xc )[y-4] = f[20];
   
 }
 
 /***********************************************************************/
 
-static void lb_read(double *m, double PFI, int x, int y) {
+static void lb_read(double *f, double PFI, int x, int y) {
 
-  lb_collisions(m);
-  lb_stream(m, fi, x, y);
+  lb_collisions(f);
+  lb_stream(f, fi, x, y);
 
 }
 
 /***********************************************************************/
 
-static void lb_write(double *m, double PFI, int x, int y) {
+static void lb_write(double *f, double PFI, int x, int y) {
 
   int xc = x%WGRID;
 
-  m[ 0] = FI( 0, xc)[y];
-  m[ 1] = FI( 1, xc)[y];
-  m[ 2] = FI( 2, xc)[y];
-  m[ 3] = FI( 3, xc)[y];
-  m[ 4] = FI( 4, xc)[y];
-  m[ 5] = FI( 5, xc)[y];
-  m[ 6] = FI( 6, xc)[y];
-  m[ 7] = FI( 7, xc)[y];
-  m[ 8] = FI( 8, xc)[y];
-  m[ 9] = FI( 9, xc)[y];
-  m[10] = FI(10, xc)[y];
-  m[11] = FI(11, xc)[y];
-  m[12] = FI(12, xc)[y];
-  m[13] = FI(13, xc)[y];
-  m[14] = FI(14, xc)[y];
-  m[15] = FI(15, xc)[y];
-  m[16] = FI(16, xc)[y];
-  m[17] = FI(17, xc)[y];
-  m[18] = FI(18, xc)[y];
-  m[19] = FI(19, xc)[y];
-  m[20] = FI(20, xc)[y];
+  f[ 0] = FI( 0, xc)[y];
+  f[ 1] = FI( 1, xc)[y];
+  f[ 2] = FI( 2, xc)[y];
+  f[ 3] = FI( 3, xc)[y];
+  f[ 4] = FI( 4, xc)[y];
+  f[ 5] = FI( 5, xc)[y];
+  f[ 6] = FI( 6, xc)[y];
+  f[ 7] = FI( 7, xc)[y];
+  f[ 8] = FI( 8, xc)[y];
+  f[ 9] = FI( 9, xc)[y];
+  f[10] = FI(10, xc)[y];
+  f[11] = FI(11, xc)[y];
+  f[12] = FI(12, xc)[y];
+  f[13] = FI(13, xc)[y];
+  f[14] = FI(14, xc)[y];
+  f[15] = FI(15, xc)[y];
+  f[16] = FI(16, xc)[y];
+  f[17] = FI(17, xc)[y];
+  f[18] = FI(18, xc)[y];
+  f[19] = FI(19, xc)[y];
+  f[20] = FI(20, xc)[y];
 
 }
 
@@ -202,8 +204,8 @@ static void lb_read_column(double *m, double PFI, int x) {
   /* boundary conditions in y */
   int xc, xp, xm, xp2, xm2;
   xc  = x%WGRID;
-  xp  = (x+1)%WGRID; xm  = (x-1)%WGRID;
-  xp2 = (x+2)%WGRID; xm2 = (x-2)%WGRID;
+  xp  = (x+1)%WGRID; xm  = (x-1+WGRID)%WGRID;
+  xp2 = (x+2)%WGRID; xm2 = (x-2+WGRID)%WGRID;
 
   FI( 3, xc )[yl]   = FI( 3, xc )[yh+1];
   FI( 5, xp )[yl]   = FI( 5, xp )[yh+1];
