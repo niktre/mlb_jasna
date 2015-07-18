@@ -31,7 +31,7 @@
 
 /* temporary/secondary grid */
 #define MAX_Y 102
-#define PFI *FI(NVEL,3,MAX_Y+2)
+#define PFI *FI(NVEL,2*HALO+1,MAX_Y+2*HALO)
 #define FI(i,x,y) fi[y][i][x]
 
 /***********************************************************************/
@@ -122,130 +122,6 @@ void lb_halo_copy() {
     }
   }
 #endif
-
-}
-
-/***********************************************************************/
-
-static void lb_inlet_x(double PFI, int x, int y, int z) {  
-  double rho, f, m0, my, mz, jx, jy, jz, nxy, nxz;
-
-  int xc, yc;
-  xc = x%3;
-  yc = y+1;
-
-  rho = 3.*lbpar.grad_p*lblattice.grid[0];
-
-  f = FI( 0, xc, yc)[z]; m0  = f;  
-  f = FI( 2, xc, yc)[z]; m0 += 2*f; 
-  f = FI( 3, xc, yc)[z]; m0 += f;   my  = f;
-  f = FI( 4, xc, yc)[z]; m0 += f;   my -= f;
-  f = FI( 5, xc, yc)[z]; m0 += f;            mz  = f;
-  f = FI( 6, xc, yc)[z]; m0 += f;            mz -= f;
-  f = FI( 8, xc, yc)[z]; m0 += 2*f; 
-  f = FI(10, xc, yc)[z]; m0 += 2*f;
-  f = FI(12, xc, yc)[z]; m0 += 2*f;
-  f = FI(14, xc, yc)[z]; m0 += 2*f;
-  f = FI(15, xc, yc)[z]; m0 += f;   my += f; mz += f;
-  f = FI(16, xc, yc)[z]; m0 += f;   my -= f; mz -= f;
-  f = FI(17, xc, yc)[z]; m0 += f;   my += f; mz -= f;
-  f = FI(18, xc, yc)[z]; m0 += f;   my -= f; mz += f;
-
-  jx = (rho - m0)/6.;
-  jy = 0.0;
-  jz = 0.0;
-
-  nxy = 2.*jy - 0.5*my;
-  nxz = 2.*jz - 0.5*mz;
-  
-  FI( 1, xc, yc)[z] = FI( 2, xc, yc)[z] + 2.*jx;
-  FI( 7, xc, yc)[z] = FI( 8, xc, yc)[z] + jx + jy + nxy;
-  FI( 9, xc, yc)[z] = FI(10, xc, yc)[z] + jx - jy - nxy;
-  FI(11, xc, yc)[z] = FI(12, xc, yc)[z] + jx + jz + nxz;
-  FI(13, xc, yc)[z] = FI(14, xc, yc)[z] + jx - jz - nxz;
-
-}
-
-/***********************************************************************/
-
-static void lb_outlet_x(double PFI, int x, int y, int z) {  
-  double rho, f, m0, my, mz, jx, jy, jz, nxy, nxz;
-
-  int xc, yc;
-  xc = x%3;
-  yc = y+1;
-
-  rho = 0.0;
-
-  f = FI( 0, xc, yc)[z]; m0  = f;  
-  f = FI( 1, xc, yc)[z]; m0 += 2*f; 
-  f = FI( 3, xc, yc)[z]; m0 += f;   my  = f;
-  f = FI( 4, xc, yc)[z]; m0 += f;   my -= f;
-  f = FI( 5, xc, yc)[z]; m0 += f;            mz  = f;
-  f = FI( 6, xc, yc)[z]; m0 += f;            mz -= f;
-  f = FI( 7, xc, yc)[z]; m0 += 2*f; 
-  f = FI( 9, xc, yc)[z]; m0 += 2*f;
-  f = FI(11, xc, yc)[z]; m0 += 2*f;
-  f = FI(13, xc, yc)[z]; m0 += 2*f;
-  f = FI(15, xc, yc)[z]; m0 += f;   my += f; mz += f;
-  f = FI(16, xc, yc)[z]; m0 += f;   my -= f; mz -= f;
-  f = FI(17, xc, yc)[z]; m0 += f;   my += f; mz -= f;
-  f = FI(18, xc, yc)[z]; m0 += f;   my -= f; mz += f;
-
-  jx = (m0 - rho)/6.;
-  jy = 0.0;
-  jz = 0.0;
-
-  nxy = 2.*jy - 0.5*my;
-  nxz = 2.*jz - 0.5*mz;
-  
-  FI( 2, xc, yc)[z] = FI( 1, xc, yc)[z] - 2.*jx;
-  FI( 8, xc, yc)[z] = FI( 7, xc, yc)[z] - jx - jy - nxy;
-  FI(10, xc, yc)[z] = FI( 9, xc, yc)[z] - jx + jy + nxy;
-  FI(12, xc, yc)[z] = FI(11, xc, yc)[z] - jx - jz - nxz;
-  FI(14, xc, yc)[z] = FI(13, xc, yc)[z] - jx + jz + nxz;
-
-}
-
-/***********************************************************************/
-
-static void lb_bounce_back_read(double PFI, int x, int y, int z) {
-  int xc, xm, yc, yp, ym, zp, zm;
-
-  xc = x%3; xm = (xc+2)%3;
-  yc = y+1; yp = yc+1; ym = yc-1;
-  zp = z+1; zm = z-1;
-
-  FI( 2, xm, yc)[z]  = FI( 1, xc, yc)[z];
-  FI( 4, xc, ym)[z]  = FI( 3, xc, yc)[z];
-  FI( 6, xc, yc)[zm] = FI( 5, xc, yc)[z];
-  FI( 8, xm, ym)[z]  = FI( 7, xc, yc)[z];
-  FI(10, xm, yp)[z]  = FI( 9, xc, yc)[z];
-  FI(12, xm, yc)[zm] = FI(11, xc, yc)[z];
-  FI(14, xm, yc)[zp] = FI(13, xc, yc)[z];
-  FI(16, xc, ym)[zm] = FI(15, xc, yc)[z];
-  FI(18, xc, ym)[zp] = FI(17, xc, yc)[z];
-
-}
-
-/***********************************************************************/
-
-static void lb_bounce_back_write(double PFI, int x, int y, int z) {
-  int xc, xp, yc, yp, ym, zp, zm;
-
-  xc = x%3; xp = (xc+1)%3;
-  yc = y+1; yp = yc+1; ym = yc-1;
-  zp = z+1; zm = z-1;
-
-  FI( 1, xp, yc)[z]  = FI( 2, xc, yc)[z];
-  FI( 3, xc, yp)[z]  = FI( 4, xc, yc)[z];
-  FI( 5, xc, yc)[zp] = FI( 6, xc, yc)[z];
-  FI( 7, xp, yp)[z]  = FI( 8, xc, yc)[z];
-  FI( 9, xp, ym)[z]  = FI(10, xc, yc)[z];
-  FI(11, xp, yc)[zp] = FI(12, xc, yc)[z];
-  FI(13, xp, yc)[zm] = FI(14, xc, yc)[z];
-  FI(15, xc, yp)[zp] = FI(16, xc, yc)[z];
-  FI(17, xc, yp)[zm] = FI(18, xc, yc)[z];
 
 }
 
@@ -524,8 +400,6 @@ static void lb_read(double *m, double PFI, int x, int y, int z) {
 static void lb_write(double *m, double PFI, int x, int y, int z) {
 
   lb_calc_modes(m, fi, x, y, z);
-  lb_collisions(m);
-  lb_add_forces(m);
 
 }
 
@@ -652,9 +526,9 @@ static void lb_init_lattice(int *grid) {
   lblattice.grid[1] = grid[1];
   lblattice.grid[2] = grid[2];
 
-  lblattice.halo_size[0] = hsize[0] = 1;
-  lblattice.halo_size[1] = hsize[1] = 1;
-  lblattice.halo_size[2] = hsize[2] = 1;
+  lblattice.halo_size[0] = hsize[0] = HALO;
+  lblattice.halo_size[1] = hsize[1] = HALO;
+  lblattice.halo_size[2] = hsize[2] = HALO;
 
   lblattice.halo_grid[0] = hgrid[0] = lblattice.grid[0] + 2*hsize[0];
   lblattice.halo_grid[1] = hgrid[1] = lblattice.grid[1] + 2*hsize[1];
