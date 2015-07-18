@@ -29,10 +29,6 @@
 
 /***********************************************************************/
 
-#define NVEL  19
-
-#define D3Q19 { NVEL, NVEL, d3q19_velocities, d3q19_norms }
-
 /* temporary/secondary grid */
 #define MAX_Y 102
 #define PFI *FI(NVEL,3,MAX_Y+2)
@@ -40,11 +36,11 @@
 
 /***********************************************************************/
 
-static const LB_Model lbmodel = D3Q19;
+static const LB_Model lbmodel = DnQm(NDIM,NVEL);
 
-static LB_Lattice lblattice = { {0,0,0}, {0,0,0}, {1,1,1}, {0,0,0}, 0 };
+static LB_Lattice lblattice;
 
-static LB_Parameters lbpar = { 1.0, 1./12., 0.0, 0.0, { 0.0, 0.0, 0.0} };
+static LB_Parameters lbpar = { 1.0, 1./6. };
 
 static double *lbmom = NULL;
 static double PFI;
