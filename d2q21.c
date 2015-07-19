@@ -412,7 +412,7 @@ void write_profile(int write_halo) {
 
 #if 1
 int main(int argc, char *argv[]) {
-  int i, n_steps, grid[3], vol;
+  int i, n_steps, grid[lbmodel.n_dim], vol;
   double rho, gamma;
   double start, finish, elapsed, mups;
 
