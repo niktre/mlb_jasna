@@ -80,9 +80,10 @@ static void lb_calc_equilibrium(double *f, double *f_eq) {
 
   int i;
   double w[lbmodel.n_vel];
-  double rho = 0.0, cs2 = 0.0, uc, u2;
-  double j[2] = { 0.0, 0.0 }, u[2];
+  double rho, cs2, uc, u2;
+  double j[lbmodel.n_dim], u[lbmodel.n_dim];
 
+  rho = j[0] = j[1] = 0.0;
   for (i=0; i<lbmodel.n_vel; ++i) {
     rho  += f[i];
     j[0] += f[i]*lbmodel.c[i][0];
@@ -354,8 +355,8 @@ void lb_finalize() {
 /***********************************************************************/
 
 void write_profile() {
-  int x, y, yl, yh;
-  double rho, j[NDIM], *m;
+  int i, x, y, yl, yh;
+  double rho, j[lbmodel.n_dim], *m;
   FILE *file;
 
   x = lblattice.halo_grid[0]>>1;
@@ -367,11 +368,11 @@ void write_profile() {
 
   file = fopen("profile.dat","w");
   for (y=yl; y<yh; ++y, m+=lbmodel.n_mom) {
-    rho  = m[0] + lbpar.rho;
-    if (rho > 0.0) {
-      j[0] = m[1]/rho;
-    } else {
-      j[0] = 0.0;
+    rho = j[0] = j[1] = 0.0;
+    for (i=0; i<lbmodel.n_vel; ++i) {
+      rho  += m[i];
+      j[0] += m[i]*lbmodel.c[i][0];
+      j[1] += m[i]*lbmodel.c[i][1];
     }
     fprintf(file,"%f %f %f\n",(double)y-yl,rho,j[0]/rho);
   }
