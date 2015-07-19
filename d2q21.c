@@ -31,7 +31,6 @@
 /***********************************************************************/
 
 /* temporary/secondary grid */
-#define MAX_Y 102
 #define PFI *FI(NVEL,WGRID)
 #define FI(i,x) fi[i][x]
 
@@ -214,17 +213,30 @@ static void lb_read_column(double *m, double PFI, int x) {
   FI( 3, xc )[yl]   = FI( 3, xc )[yh+1];
   FI( 5, xp )[yl]   = FI( 5, xp )[yh+1];
   FI( 7, xm )[yl]   = FI( 7, xm )[yh+1];
-  FI(11, xc )[yl+1] = FI(11, xc )[yh+2];
-  FI(13, xp2)[yl+1] = FI(13, xp2)[yh+2];
-  FI(15, xm2)[yl+1] = FI(15, xm2)[yh+2];
-  FI(19, xc )[yl+3] = FI(19, xc )[yh+4];
-
   FI( 4, xc )[yh]   = FI( 4, xc )[yl-1];
   FI( 6, xm )[yh]   = FI( 6, xm )[yl-1];
   FI( 8, xp )[yh]   = FI( 8, xp )[yl-1];
+
+  FI(11, xc )[yl]   = FI(11, xc )[yh+1];
+  FI(13, xp2)[yl]   = FI(13, xp2)[yh+1];
+  FI(15, xm2)[yl]   = FI(15, xm2)[yh+1];
+  FI(12, xc )[yh]   = FI(12, xc )[yl-1];
+  FI(14, xm2)[yh]   = FI(14, xm2)[yl-1];
+  FI(16, xp2)[yh]   = FI(16, xp2)[yl-1];
+  FI(11, xc )[yl+1] = FI(11, xc )[yh+2];
+  FI(13, xp2)[yl+1] = FI(13, xp2)[yh+2];
+  FI(15, xm2)[yl+1] = FI(15, xm2)[yh+2];
   FI(12, xc )[yh-1] = FI(12, xc )[yl-2];
   FI(14, xm2)[yh-1] = FI(14, xm2)[yl-2];
   FI(16, xp2)[yh-1] = FI(16, xp2)[yl-2];
+
+  FI(19, xc )[yl]   = FI(19, xc )[yh+1];
+  FI(19, xc )[yl+1] = FI(19, xc )[yh+2];
+  FI(19, xc )[yl+2] = FI(19, xc )[yh+3];
+  FI(19, xc )[yl+3] = FI(19, xc )[yh+4];
+  FI(20, xc )[yh]   = FI(20, xc )[yl-1];
+  FI(20, xc )[yh-1] = FI(20, xc )[yl-2];
+  FI(20, xc )[yh-2] = FI(20, xc )[yl-3];
   FI(20, xc )[yh-3] = FI(20, xc )[yl-4];
 
 }
@@ -253,13 +265,13 @@ void lb_update() {
   lb_halo_copy(); /* need up to date moments in halo */
 
   /* Columns in the lower halo will be read only */
-  for (x=0; x<HALO; ++x, m+=xstride) {
+  for (x=0; x<lblattice.halo_size[0]; ++x, m+=xstride) {
     lb_read_column(m, fi, x);
   }
 
   /* Collide and stream column x, read back column x-HALO
    * x-HALO can be overwritten and all info is available now */
-  for (x=HALO; x<lblattice.halo_grid[0]; ++x, m+=xstride) {
+  for (x=lblattice.halo_size[0]; x<lblattice.halo_grid[0]; ++x, m+=xstride) {
     lb_read_column(m, fi, x);
     lb_write_column(m-HALO*xstride, fi, x-HALO);
   }
@@ -354,21 +366,30 @@ void lb_finalize() {
 
 /***********************************************************************/
 
-void write_profile() {
-  int i, x, y, xl, xh, yl, yh;
+void write_profile(int write_halo) {
+  int i, x, y, xl, xh, yl, yh, xoff;
   double rho, j[lbmodel.n_dim], *m;
   FILE *file;
 
-  xl = lblattice.halo_size[0];
-  xh = lblattice.halo_size[0] + lblattice.grid[0];
+  if (write_halo) {
+    lb_halo_copy();
+    xl = 0;
+    xh = lblattice.halo_grid[0];
+    yl = 0;
+    yh = lblattice.halo_grid[1];
+  } else {
+    xl = lblattice.halo_size[0];
+    xh = lblattice.halo_size[0] + lblattice.grid[0];
+    yl = lblattice.halo_size[1];
+    yh = lblattice.halo_size[1] + lblattice.grid[1];
+  }
 
-  yl = lblattice.halo_size[1];
-  yh = lblattice.halo_size[1] + lblattice.grid[1];
+  xoff = lblattice.halo_grid[0] - (xh - xl);
 
   m = lbmom + lbmodel.n_mom*(lblattice.stride[0]*xl+yl);
 
   file = fopen("profile.dat","w");
-  for (x=xl; x<xh; ++x, m+=lbmodel.n_mom*lblattice.halo_size[1]*2) {
+  for (x=xl; x<xh; ++x, m+=lbmodel.n_mom*xoff) {
     for (y=yl; y<yh; ++y, m+=lbmodel.n_mom) {
       rho = j[0] = j[1] = 0.0;
       for (i=0; i<lbmodel.n_vel; ++i) {
@@ -421,7 +442,7 @@ int main(int argc, char *argv[]) {
 
   fprintf(stdout, "Elapsed time: %.3f s (%.3e MUPS)\n", elapsed, mups); fflush(stdout); 
 
-  write_profile();
+  write_profile(0);
 
   lb_finalize();
 
