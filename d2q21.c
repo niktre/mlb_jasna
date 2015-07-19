@@ -123,6 +123,7 @@ static void lb_collisions(double *f) {
 /***********************************************************************/
 
 static void lb_stream(double *f, double PFI, int x, int y) {
+
   int xc, xp, xm, xp2, xm2, xp4, xm4;
   xc = x%WGRID;
   xp  = (x+1)%WGRID; xm  = (x-1+WGRID)%WGRID;
@@ -155,16 +156,52 @@ static void lb_stream(double *f, double PFI, int x, int y) {
 
 /***********************************************************************/
 
-static void lb_read(double *f, double PFI, int x, int y) {
+static void lb_pbc_y(double PFI, int x) {
 
-  lb_collisions(f);
-  lb_stream(f, fi, x, y);
+  int yl, yh;
+  yl = lblattice.halo_size[1];
+  yh = lblattice.halo_size[1] + lblattice.grid[1] - 1;
+
+  int xc, xp, xm, xp2, xm2;
+  xc  = x%WGRID;
+  xp  = (x+1)%WGRID; xm  = (x-1+WGRID)%WGRID;
+  xp2 = (x+2)%WGRID; xm2 = (x-2+WGRID)%WGRID;
+
+  /* periodic boundary conditions in y */
+  FI( 3, xc )[yl]   = FI( 3, xc )[yh+1];
+  FI( 5, xp )[yl]   = FI( 5, xp )[yh+1];
+  FI( 7, xm )[yl]   = FI( 7, xm )[yh+1];
+  FI( 4, xc )[yh]   = FI( 4, xc )[yl-1];
+  FI( 6, xm )[yh]   = FI( 6, xm )[yl-1];
+  FI( 8, xp )[yh]   = FI( 8, xp )[yl-1];
+
+  FI(11, xc )[yl]   = FI(11, xc )[yh+1];
+  FI(13, xp2)[yl]   = FI(13, xp2)[yh+1];
+  FI(15, xm2)[yl]   = FI(15, xm2)[yh+1];
+  FI(12, xc )[yh]   = FI(12, xc )[yl-1];
+  FI(14, xm2)[yh]   = FI(14, xm2)[yl-1];
+  FI(16, xp2)[yh]   = FI(16, xp2)[yl-1];
+  FI(11, xc )[yl+1] = FI(11, xc )[yh+2];
+  FI(13, xp2)[yl+1] = FI(13, xp2)[yh+2];
+  FI(15, xm2)[yl+1] = FI(15, xm2)[yh+2];
+  FI(12, xc )[yh-1] = FI(12, xc )[yl-2];
+  FI(14, xm2)[yh-1] = FI(14, xm2)[yl-2];
+  FI(16, xp2)[yh-1] = FI(16, xp2)[yl-2];
+
+  FI(19, xc )[yl]   = FI(19, xc )[yh+1];
+  FI(19, xc )[yl+1] = FI(19, xc )[yh+2];
+  FI(19, xc )[yl+2] = FI(19, xc )[yh+3];
+  FI(19, xc )[yl+3] = FI(19, xc )[yh+4];
+  FI(20, xc )[yh]   = FI(20, xc )[yl-1];
+  FI(20, xc )[yh-1] = FI(20, xc )[yl-2];
+  FI(20, xc )[yh-2] = FI(20, xc )[yl-3];
+  FI(20, xc )[yh-3] = FI(20, xc )[yl-4];
 
 }
 
 /***********************************************************************/
 
-static void lb_write(double *f, double PFI, int x, int y) {
+static void lb_write_back(double *f, double PFI, int x, int y) {
 
   int xc = x%WGRID;
 
@@ -194,6 +231,23 @@ static void lb_write(double *f, double PFI, int x, int y) {
 
 /***********************************************************************/
 
+static void lb_read(double *f, double PFI, int x, int y) {
+
+  lb_collisions(f);
+  lb_stream(f, fi, x, y);
+
+}
+
+/***********************************************************************/
+
+static void lb_write(double *f, double PFI, int x, int y) {
+
+  lb_write_back(f, fi, x, y);
+
+}
+
+/***********************************************************************/
+
 static void lb_read_column(double *f, double PFI, int x) {
   int y, yl, yh;
 
@@ -204,40 +258,7 @@ static void lb_read_column(double *f, double PFI, int x) {
     lb_read(f, fi, x, y);
   }
 
-  /* boundary conditions in y */
-  int xc, xp, xm, xp2, xm2;
-  xc  = x%WGRID;
-  xp  = (x+1)%WGRID; xm  = (x-1+WGRID)%WGRID;
-  xp2 = (x+2)%WGRID; xm2 = (x-2+WGRID)%WGRID;
-
-  FI( 3, xc )[yl]   = FI( 3, xc )[yh+1];
-  FI( 5, xp )[yl]   = FI( 5, xp )[yh+1];
-  FI( 7, xm )[yl]   = FI( 7, xm )[yh+1];
-  FI( 4, xc )[yh]   = FI( 4, xc )[yl-1];
-  FI( 6, xm )[yh]   = FI( 6, xm )[yl-1];
-  FI( 8, xp )[yh]   = FI( 8, xp )[yl-1];
-
-  FI(11, xc )[yl]   = FI(11, xc )[yh+1];
-  FI(13, xp2)[yl]   = FI(13, xp2)[yh+1];
-  FI(15, xm2)[yl]   = FI(15, xm2)[yh+1];
-  FI(12, xc )[yh]   = FI(12, xc )[yl-1];
-  FI(14, xm2)[yh]   = FI(14, xm2)[yl-1];
-  FI(16, xp2)[yh]   = FI(16, xp2)[yl-1];
-  FI(11, xc )[yl+1] = FI(11, xc )[yh+2];
-  FI(13, xp2)[yl+1] = FI(13, xp2)[yh+2];
-  FI(15, xm2)[yl+1] = FI(15, xm2)[yh+2];
-  FI(12, xc )[yh-1] = FI(12, xc )[yl-2];
-  FI(14, xm2)[yh-1] = FI(14, xm2)[yl-2];
-  FI(16, xp2)[yh-1] = FI(16, xp2)[yl-2];
-
-  FI(19, xc )[yl]   = FI(19, xc )[yh+1];
-  FI(19, xc )[yl+1] = FI(19, xc )[yh+2];
-  FI(19, xc )[yl+2] = FI(19, xc )[yh+3];
-  FI(19, xc )[yl+3] = FI(19, xc )[yh+4];
-  FI(20, xc )[yh]   = FI(20, xc )[yl-1];
-  FI(20, xc )[yh-1] = FI(20, xc )[yl-2];
-  FI(20, xc )[yh-2] = FI(20, xc )[yl-3];
-  FI(20, xc )[yh-3] = FI(20, xc )[yl-4];
+  lb_pbc_y(fi, x);
 
 }
 
