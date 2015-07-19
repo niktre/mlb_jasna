@@ -442,7 +442,7 @@ int main(int argc, char *argv[]) {
 
   fprintf(stdout, "Elapsed time: %.3f s (%.3e MUPS)\n", elapsed, mups); fflush(stdout); 
 
-  write_profile(1);
+  write_profile(0);
 
   lb_finalize();
 
