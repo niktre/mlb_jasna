@@ -354,21 +354,29 @@ void lb_finalize() {
 
 /***********************************************************************/
 
-void write_profile() {
-  int i, x, y, xl, xh, yl, yh;
+void write_profile(int write_halo) {
+  int i, x, y, xl, xh, yl, yh, xoff;
   double rho, j[lbmodel.n_dim], *m;
   FILE *file;
 
-  xl = lblattice.halo_size[0];
-  xh = lblattice.halo_size[0] + lblattice.grid[0];
+  if (write_halo) {
+    xl = 0;
+    xh = lblattice.halo_grid[0];
+    yl = 0;
+    yh = lblattice.halo_grid[1];
+  } else {
+    xl = lblattice.halo_size[0];
+    xh = lblattice.halo_size[0] + lblattice.grid[0];
+    yl = lblattice.halo_size[1];
+    yh = lblattice.halo_size[1] + lblattice.grid[1];
+  }
 
-  yl = lblattice.halo_size[1];
-  yh = lblattice.halo_size[1] + lblattice.grid[1];
+  xoff = lblattice.halo_grid[0] - (xh - xl);
 
   m = lbmom + lbmodel.n_mom*(lblattice.stride[0]*xl+yl);
 
   file = fopen("profile.dat","w");
-  for (x=xl; x<xh; ++x, m+=lbmodel.n_mom*lblattice.halo_size[1]*2) {
+  for (x=xl; x<xh; ++x, m+=lbmodel.n_mom*xoff) {
     for (y=yl; y<yh; ++y, m+=lbmodel.n_mom) {
       rho = j[0] = j[1] = 0.0;
       for (i=0; i<lbmodel.n_vel; ++i) {
@@ -421,7 +429,7 @@ int main(int argc, char *argv[]) {
 
   fprintf(stdout, "Elapsed time: %.3f s (%.3e MUPS)\n", elapsed, mups); fflush(stdout); 
 
-  write_profile();
+  write_profile(1);
 
   lb_finalize();
 
