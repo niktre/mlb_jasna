@@ -393,7 +393,7 @@ void lb_finalize() {
 
 void write_profile(int write_halo) {
   int i, x, y, xl, xh, yl, yh, xoff;
-  double rho, j[lbmodel.n_dim], *m;
+  double rho, j[lbmodel.n_dim], *f;
   FILE *file;
 
   if (write_halo) {
@@ -411,16 +411,16 @@ void write_profile(int write_halo) {
 
   xoff = lblattice.halo_grid[0] - (xh - xl);
 
-  m = lbpop + lbmodel.n_vel*(lblattice.stride[0]*xl+yl);
+  f = lbpop + lbmodel.n_vel*(lblattice.stride[0]*xl+yl);
 
   file = fopen("profile.dat","w");
-  for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
-    for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
+  for (x=xl; x<xh; ++x, f+=lbmodel.n_vel*xoff) {
+    for (y=yl; y<yh; ++y, f+=lbmodel.n_vel) {
       rho = j[0] = j[1] = 0.0;
       for (i=0; i<lbmodel.n_vel; ++i) {
-	rho  += m[i];
-	j[0] += m[i]*lbmodel.c[i][0];
-	j[1] += m[i]*lbmodel.c[i][1];
+	rho  += f[i];
+	j[0] += f[i]*lbmodel.c[i][0];
+	j[1] += f[i]*lbmodel.c[i][1];
       }
       fprintf(file,"%f %f %f %f\n",(double)x-xl,(double)y-yl,rho,j[0]/rho);
     }
