@@ -32,7 +32,7 @@
 #define NORMS(D,Q)   d##D##q##Q##_norms
 /* these macros are necessary to force prescan in the macro below */
 /* because prescan does not occur for stringify and concat */
-#define DnQm(D,Q)  { D, Q, Q, VELS(D,Q) }
+#define DnQm(D,Q)  { D, Q, VELS(D,Q) }
 
 /***********************************************************************/
 
@@ -44,7 +44,6 @@ typedef struct _LBpar {
 typedef const struct _LBmodel {
   const int n_dim;
   const int n_vel;
-  const int n_mom;
   const double (*c)[NDIM];
 } LB_Model;
 

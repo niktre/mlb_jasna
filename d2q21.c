@@ -42,7 +42,7 @@ static LB_Lattice lblattice;
 
 static LB_Parameters lbpar = { 1.0, 0.0 };
 
-static double *lbmom = NULL;
+static double *lbpop = NULL;
 static double PFI;
 
 /***********************************************************************/
@@ -52,8 +52,8 @@ void lb_halo_copy() {
   int x, y;
   int lsrc, rsrc, ldst, rdst, size;
 
-  int xstride = lbmodel.n_mom*lblattice.stride[0];
-  int ystride = lbmodel.n_mom*lblattice.stride[1];
+  int xstride = lbmodel.n_vel*lblattice.stride[0];
+  int ystride = lbmodel.n_vel*lblattice.stride[1];
 
   /***************
    * X direction *
@@ -66,8 +66,8 @@ void lb_halo_copy() {
   rsrc = lblattice.grid[0]*xstride;
   rdst = rsrc + size;
 
-  memcpy(lbmom+ldst, lbmom+rsrc, size*sizeof(*lbmom));
-  memcpy(lbmom+rdst, lbmom+lsrc, size*sizeof(*lbmom));
+  memcpy(lbpop+ldst, lbpop+rsrc, size*sizeof(*lbpop));
+  memcpy(lbpop+rdst, lbpop+lsrc, size*sizeof(*lbpop));
 
   /* Y direction is handled directly in the update loop */
 
@@ -194,14 +194,14 @@ static void lb_write(double *f, double PFI, int x, int y) {
 
 /***********************************************************************/
 
-static void lb_read_column(double *m, double PFI, int x) {
+static void lb_read_column(double *f, double PFI, int x) {
   int y, yl, yh;
 
   yl = lblattice.halo_size[1];
   yh = lblattice.halo_size[1] + lblattice.grid[1] - 1;
 
-  for (y=yl, m+=yl*lbmodel.n_mom; y<=yh; ++y, m+=lbmodel.n_mom) {
-    lb_read(m, fi, x, y);
+  for (y=yl, f+=yl*lbmodel.n_vel; y<=yh; ++y, f+=lbmodel.n_vel) {
+    lb_read(f, fi, x, y);
   }
 
   /* boundary conditions in y */
@@ -243,14 +243,14 @@ static void lb_read_column(double *m, double PFI, int x) {
 
 /***********************************************************************/
 
-static void lb_write_column(double *m, double PFI, int x) {
+static void lb_write_column(double *f, double PFI, int x) {
   int y, yl, yh;
 
   yl = lblattice.halo_size[1];
   yh = lblattice.halo_size[1] + lblattice.grid[1] - 1;
 
-  for (y=yl, m+=yl*lbmodel.n_mom; y<=yh; ++y, m+=lbmodel.n_mom) {
-    lb_write(m, fi, x, y);
+  for (y=yl, f+=yl*lbmodel.n_vel; y<=yh; ++y, f+=lbmodel.n_vel) {
+    lb_write(f, fi, x, y);
   }
   
 }
@@ -259,21 +259,21 @@ static void lb_write_column(double *m, double PFI, int x) {
 
 void lb_update() {
   int x;
-  int xstride = lblattice.stride[0]*lbmodel.n_mom;
-  double *m   = lbmom;
+  int xstride = lblattice.stride[0]*lbmodel.n_vel;
+  double *f   = lbpop;
 
   lb_halo_copy(); /* need up to date moments in halo */
 
   /* Columns in the lower halo will be read only */
-  for (x=0; x<lblattice.halo_size[0]; ++x, m+=xstride) {
-    lb_read_column(m, fi, x);
+  for (x=0; x<lblattice.halo_size[0]; ++x, f+=xstride) {
+    lb_read_column(f, fi, x);
   }
 
   /* Collide and stream column x, read back column x-HALO
    * x-HALO can be overwritten and all info is available now */
-  for (x=lblattice.halo_size[0]; x<lblattice.halo_grid[0]; ++x, m+=xstride) {
-    lb_read_column(m, fi, x);
-    lb_write_column(m-HALO*xstride, fi, x-HALO);
+  for (x=lblattice.halo_size[0]; x<lblattice.halo_grid[0]; ++x, f+=xstride) {
+    lb_read_column(f, fi, x);
+    lb_write_column(f-HALO*xstride, fi, x-HALO);
   }
 
 }
@@ -283,16 +283,16 @@ void lb_update() {
 static void lb_init_fluid() {
   int x, y, z, i;
   double  cs2, w[lbmodel.n_vel];
-  double *m = lbmom;
+  double *f = lbpop;
 
   cs2 = eq_state(lbpar.rho);
 
   lb_weights(w, cs2);
 
   for (x=0; x<lblattice.halo_grid[0]; ++x) {
-    for (y=0; y<lblattice.halo_grid[1]; ++y, m+=lbmodel.n_mom) {
+    for (y=0; y<lblattice.halo_grid[1]; ++y, f+=lbmodel.n_vel) {
       for (i=0; i<lbmodel.n_vel; ++i) {
-        m[i] = w[i]*lbpar.rho;
+        f[i] = w[i]*lbpar.rho;
       }
     }
   }
@@ -318,7 +318,7 @@ static void lb_init_lattice(int *grid) {
 
   lblattice.halo_grid_volume = hgrid[0]*hgrid[1];
 
-  lbmom = calloc(lblattice.halo_grid_volume*lbmodel.n_mom, sizeof(*lbmom));
+  lbpop = calloc(lblattice.halo_grid_volume*lbmodel.n_vel, sizeof(*lbpop));
 
   for (i=0; i<lbmodel.n_vel; ++i) {
     for (x=0; x<WGRID; ++x) {
@@ -360,7 +360,7 @@ void lb_finalize() {
     }
   }    
 
-  free(lbmom);
+  free(lbpop);
 
 }
 
@@ -386,11 +386,11 @@ void write_profile(int write_halo) {
 
   xoff = lblattice.halo_grid[0] - (xh - xl);
 
-  m = lbmom + lbmodel.n_mom*(lblattice.stride[0]*xl+yl);
+  m = lbpop + lbmodel.n_vel*(lblattice.stride[0]*xl+yl);
 
   file = fopen("profile.dat","w");
-  for (x=xl; x<xh; ++x, m+=lbmodel.n_mom*xoff) {
-    for (y=yl; y<yh; ++y, m+=lbmodel.n_mom) {
+  for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
+    for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
       rho = j[0] = j[1] = 0.0;
       for (i=0; i<lbmodel.n_vel; ++i) {
 	rho  += m[i];
