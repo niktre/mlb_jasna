@@ -85,7 +85,7 @@ static const double d2q21_velocities[21][2] = { {  0.,  0. },
 void lb_weights(double *w, double sigma2) {
   int i;
 
-  w[ 0] = 1.0 - 45./2.*sigma2*(7./60. - 7./48.*sigma2 + sigma2*sigma2/16.);
+  w[ 0] = 1. - 45./2.*sigma2*(7./60. - 7./48.*sigma2 + sigma2*sigma2/16.);
   w[ 1] = sigma2/3.*(32./15. - 4.*sigma2 + 2.*sigma2*sigma2);
   w[ 5] = sigma2*(sigma2/3. - sigma2*sigma2/4.);
   w[ 9] = sigma2*(-1./18. + 3./16.*sigma2 - sigma2*sigma2/12.);
@@ -101,3 +101,5 @@ void lb_weights(double *w, double sigma2) {
   }
 
 }
+
+/***********************************************************************/
