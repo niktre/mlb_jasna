@@ -26,6 +26,7 @@
 #include <string.h>
 #include <math.h>
 #include "d2q21.h"
+#include "derivFD.h"
 #include "defs.h"
 
 /***********************************************************************/

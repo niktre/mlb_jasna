@@ -5,9 +5,9 @@ CLEANNAME = clean
 CC = gcc
 LFLAGS = -lm
 
-SOURCE = d2q21.c fbgk6.c general.c derivatives.c
+SOURCE = d2q21.c derivFD.c fbgk6.c general.c derivatives.c
 
-OBJECT = d2q21.o fbgk6.o general.o derivatives.o
+OBJECT = d2q21.o derivFD.o fbgk6.o general.o derivatives.o
 
 FILES = output/*
 
