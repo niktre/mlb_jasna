@@ -20,6 +20,11 @@
  * 
  ***********************************************************************/
 
+#ifndef D2Q21_H
+#define D2Q21_H
+
+/***********************************************************************/
+
 #define NDIM 2
 #define NVEL 21
 #define HALO 4
@@ -81,7 +86,7 @@ static const double d2q21_velocities[21][2] = { {  0.,  0. },
 
 /***********************************************************************/
 
-void lb_weights(double *w, double sigma2) {
+static void lb_weights(double *w, double sigma2) {
   int i;
 
   w[ 0] = 1. - 45./2.*sigma2*(7./60. - 7./48.*sigma2 + sigma2*sigma2/16.);
@@ -100,5 +105,17 @@ void lb_weights(double *w, double sigma2) {
   }
 
 }
+
+/***********************************************************************/
+
+static const LB_Model lbmodel = DnQm(NDIM,NVEL);
+
+LB_Lattice lblattice;
+
+LB_Parameters lbpar;
+
+/***********************************************************************/
+
+#endif
 
 /***********************************************************************/

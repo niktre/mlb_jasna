@@ -38,12 +38,6 @@
 
 /***********************************************************************/
 
-static const LB_Model lbmodel = DnQm(NDIM,NVEL);
-
-static LB_Lattice lblattice;
-
-static LB_Parameters lbpar = { 1.0, 0.0 };
-
 static double *lbf = NULL;
 static double PFI;
 

@@ -1,6 +1,8 @@
 #ifndef _DEFS_H
 #define _DEFS_H
 
+#include "d2q21.h"
+
 /* lattice size */
 #define XDIM 100
 #define YDIM XDIM
