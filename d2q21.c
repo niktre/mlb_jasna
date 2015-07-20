@@ -26,6 +26,7 @@
 #include <string.h>
 #include <math.h>
 #include "d2q21.h"
+#include "mlb.h"
 #include "defs.h"
 
 /***********************************************************************/
@@ -173,7 +174,7 @@ static void lb_collisions(double *f, int x, int y) {
 
   lb_bulk_collisions(f);
 
-  /* lb_interface_collisions(f, int x, int y) */
+  mlb_interface_collisions(f, x, y);
 
 }
 
