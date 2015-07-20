@@ -154,8 +154,8 @@ static void lb_calc_equilibrium(double *f, double *f_eq) {
 
 /***********************************************************************/
 
-static void lb_collisions(double *f) {
-  
+static void lb_bulk_collisions(double *f) {
+
   int i;
   double f_eq[lbmodel.n_vel];
   
@@ -165,6 +165,16 @@ static void lb_collisions(double *f) {
     f[i] = f_eq[i] + lbpar.gamma * ( f[i] - f_eq[i] );
   }
   
+}
+
+/***********************************************************************/
+
+static void lb_collisions(double *f, int x, int y) {
+
+  lb_bulk_collisions(f);
+
+  /* lb_interface_collisions(f, int x, int y) */
+
 }
 
 /***********************************************************************/
@@ -280,7 +290,7 @@ static void lb_write_back(double *f, double PFI, int x, int y) {
 
 static void lb_read(double *f, double PFI, int x, int y) {
 
-  lb_collisions(f);
+  lb_collisions(f, x, y);
   lb_stream(f, fi, x, y);
 
 }
