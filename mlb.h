@@ -7,6 +7,8 @@
  *
  ***********************************************************************/
 
-void mlb_interface_collisions(double *f, int x, int y);
+void mlb_calc_force(double *force, double *f, int x, int y);
+
+void mlb_interface_collisions(double *f, double *force);
 
 /***********************************************************************/

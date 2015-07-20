@@ -125,7 +125,7 @@ static void lb_calc_modes(double *f) {
 
 /***********************************************************************/
 
-static void lb_calc_equilibrium(double *f, double *f_eq) {
+static void lb_calc_equilibrium(double *f_eq, double *f, double *force) {
 
   int i;
   double w[lbmodel.n_vel];
@@ -133,8 +133,8 @@ static void lb_calc_equilibrium(double *f, double *f_eq) {
   double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
 
   rho  = m[0];
-  u[0] = m[1]/rho;
-  u[1] = m[2]/rho;
+  u[0] = (m[1] + 0.5*force[0])/rho;
+  u[1] = (m[2] + 0.5*force[1])/rho;
   u2   = (u[0]*u[0] + u[1]*u[1])/cs2;
 
   cs2 = eq_state(rho);
@@ -150,12 +150,12 @@ static void lb_calc_equilibrium(double *f, double *f_eq) {
 
 /***********************************************************************/
 
-static void lb_bulk_collisions(double *f) {
+static void lb_bulk_collisions(double *f, double *force) {
 
   int i;
   double f_eq[lbmodel.n_vel];
   
-  lb_calc_equilibrium(f, f_eq);
+  lb_calc_equilibrium(f_eq, f, force);
 
   for (i=0; i<lbmodel.n_vel; ++i) {
     f[i] = f_eq[i] + lbpar.gamma * ( f[i] - f_eq[i] );
@@ -167,9 +167,15 @@ static void lb_bulk_collisions(double *f) {
 
 static void lb_collisions(double *f, int x, int y) {
 
-  lb_bulk_collisions(f);
+  double force[lbmodel.n_dim];
 
-  mlb_interface_collisions(f, x, y);
+  force[0] = force[1] = 0.0;
+
+  mlb_calc_force(force, f, x, y);
+
+  lb_bulk_collisions(f, force);
+
+  mlb_interface_collisions(f, force);
 
 }
 
