@@ -3,11 +3,13 @@ NAME = run
 CLEANNAME = clean
 
 CC = gcc
-LFLAGS = -lm
+LFLAGS += -lm
 
-SOURCE = d2q21.c derivFD.c fbgk6.c general.c derivatives.c
+HEADERS = mlb.h d2q21.h defs.h derivFD.h
 
-OBJECT = d2q21.o derivFD.o fbgk6.o general.o derivatives.o
+SOURCE = mlb.c derivFD.c d2q21.c fbgk6.c general.c derivatives.c
+
+OBJECT = mlb.o derivFD.o d2q21.o fbgk6.o general.o derivatives.o
 
 FILES = output/*
 
@@ -21,4 +23,4 @@ $(CLEANNAME):
 $(NAME):	$(OBJECT)
 		$(CC) -o $@ $(CFLAGS) $(OBJECT) $(LFLAGS)
 
-$(OBJECT): defs.h
+$(OBJECT): $(HEADERS)
