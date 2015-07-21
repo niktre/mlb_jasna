@@ -21,7 +21,7 @@ void mlb_calc_force(double *force, double *f, int x, int y) {
   rho = m[0];
 
   for (i=0; i<lbmodel.n_fd; ++i) {
-    nb_rho = *(m + lblattice.nb_offset[i]*lbmodel.n_vel);
+    nb_rho = m[lblattice.nb_offset[i]*lbmodel.n_vel];
     force[0] += w[i]*c[i][0]*nb_rho;
     force[1] += w[i]*c[i][1]*nb_rho;
   }
