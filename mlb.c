@@ -19,7 +19,7 @@ void mlb_interface_collisions(double *f, double *force) {
   double rho, cs2, fc;
   double w[lbmodel.n_vel];
 
-  rho = lbpar.rho;
+  rho = RHO_MEAN;
   cs2 = eq_state(rho);
   lb_weights(w, cs2);
 

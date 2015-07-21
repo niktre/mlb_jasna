@@ -135,11 +135,11 @@ static void lb_calc_equilibrium(double *f_eq, double *f, double *force) {
   rho  = m[0];
   u[0] = (m[1] + 0.5*force[0])/rho;
   u[1] = (m[2] + 0.5*force[1])/rho;
-  u2   = (u[0]*u[0] + u[1]*u[1])/cs2;
 
   cs2 = eq_state(rho);
-
   lb_weights(w, cs2);
+
+  u2   = (u[0]*u[0] + u[1]*u[1])/cs2;
 
   for (i=0; i<lbmodel.n_vel; ++i) {
     uc = (u[0]*lbmodel.c[i][0] + u[1]*lbmodel.c[i][1])/cs2;
@@ -158,7 +158,7 @@ static void lb_bulk_collisions(double *f, double *force) {
   lb_calc_equilibrium(f_eq, f, force);
 
   for (i=0; i<lbmodel.n_vel; ++i) {
-    f[i] = f_eq[i] + lbpar.gamma * ( f[i] - f_eq[i] );
+    f[i] += (lbpar.gamma - 1.) * ( f[i] - f_eq[i] );
   }
   
 }
