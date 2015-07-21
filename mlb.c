@@ -12,7 +12,26 @@
 /***********************************************************************/
 
 void mlb_calc_force(double *force, double *f, int x, int y) {
+  const double *w = lbmodel.fd_weights[3];
+  const double (*c)[lbmodel.n_dim] = lbmodel.c;
+  double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
+  int i;
+  double rho, nb_rho;
+
+  rho = m[0];
+
+  for (i=0; i<lbmodel.n_fd; ++i) {
+    nb_rho = *(m + lblattice.nb_offset[i]*lbmodel.n_vel);
+    force[0] += w[i]*c[i][0]*nb_rho;
+    force[1] += w[i]*c[i][1]*nb_rho;
+  }
+
+  force[0] *= lbpar.kappa*rho;
+  force[1] *= lbpar.kappa*rho;
+
 }
+
+/***********************************************************************/
 
 void mlb_interface_collisions(double *f, double *force) {
   int i;
