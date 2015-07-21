@@ -376,10 +376,10 @@ static void lb_init_fluid() {
   for (x=0; x<lblattice.halo_grid[0]; ++x) {
     for (y=0; y<lblattice.halo_grid[1]; ++y, f+=lbmodel.n_vel) {
       for (i=0; i<lbmodel.n_vel; ++i) {
-	if (x==lblattice.halo_size[0]+2 && y==lblattice.halo_size[1]+3) {
-	  f[i] = w[i]*lbpar.rho*2;
+	if (x<lblattice.halo_grid[0]/2 && y<lblattice.halo_grid[1]/2) {
+	  f[i] = w[i]*lbpar.rho*1.4;
 	} else {
-	  f[i] = w[i]*lbpar.rho;
+	  f[i] = w[i]*lbpar.rho*1.2;
 	}
       }
       lb_calc_modes(f);
@@ -508,14 +508,14 @@ int main(int argc, char *argv[]) {
 
   n_steps = atoi(argv[1]);
 
-  grid[0] = 10;
-  grid[1] = 10;
+  grid[0] = 20;
+  grid[1] = 20;
 
   vol = grid[0]*grid[1];
 
   rho   = 1.0;
   gamma = 0.0;
-  kappa = 0.0;
+  kappa = 0.1;
 
   lb_init(grid,rho,gamma,kappa);
 
