@@ -413,24 +413,26 @@ static void lb_init_lattice(int *grid) {
     for (x=0; x<WGRID; ++x) {
       FI(i,x) = calloc(lblattice.halo_grid[1],sizeof(*FI(0,0)));
     }
+    lblattice.nb_offset[i] = (int)lbmodel.c[i][0]*hgrid[1]+(int)lbmodel.c[i][1];
   }
 
 }
 
 /***********************************************************************/
 
-static void lb_init_parameters(double rho, double gamma) {
+static void lb_init_parameters(double rho, double gamma, double kappa) {
 
   lbpar.rho   = rho;
   lbpar.gamma = gamma;
+  lbpar.kappa = kappa;
 
 }
 
 /***********************************************************************/
 
-void lb_init(int *grid, double rho, double gamma) {
+void lb_init(int *grid, double rho, double gamma, double kappa) {
 
-  lb_init_parameters(rho, gamma);
+  lb_init_parameters(rho, gamma, kappa);
 
   lb_init_lattice(grid);
 
@@ -496,7 +498,7 @@ void write_profile(int write_halo) {
 #if 1
 int main(int argc, char *argv[]) {
   int i, n_steps, grid[lbmodel.n_dim], vol;
-  double rho, gamma;
+  double rho, gamma, kappa;
   double start, finish, elapsed, mups;
 
   if (argc!=2) {
@@ -513,8 +515,9 @@ int main(int argc, char *argv[]) {
 
   rho   = 1.0;
   gamma = 0.0;
+  kappa = 0.0;
 
-  lb_init(grid,rho,gamma);
+  lb_init(grid,rho,gamma,kappa);
 
   fprintf(stdout, "Running  %d iterations\n", n_steps); fflush(stdout);
 
