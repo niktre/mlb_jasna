@@ -45,7 +45,7 @@ static double PFI;
 
 void lb_halo_copy() {
 
-  int x, y;
+  int x;
   int lsrc, rsrc, ldst, rdst, size;
 
   int totalsize = lbmodel.n_vel*lblattice.halo_grid_volume;
@@ -362,7 +362,7 @@ void lb_update() {
 /***********************************************************************/
 
 static void lb_init_fluid() {
-  int x, y, z, i;
+  int x, y, i;
   double  cs2, w[lbmodel.n_vel];
   double *f = lbf;
 
@@ -388,7 +388,7 @@ static void lb_init_fluid() {
 /***********************************************************************/
 
 static void lb_init_lattice(int *grid) {
-  int i, x, y, hgrid[lbmodel.n_dim], hsize[lbmodel.n_dim];
+  int i, x, hgrid[lbmodel.n_dim], hsize[lbmodel.n_dim];
 
   lblattice.grid[0] = grid[0];
   lblattice.grid[1] = grid[1];
@@ -438,7 +438,7 @@ void lb_init(int *grid, double rho, double gamma) {
 /***********************************************************************/
 
 void lb_finalize() {
-  int i, x, y;
+  int i, x;
 
   for (i=0; i<lbmodel.n_vel; ++i) {
     for (x=0; x<WGRID; ++x) {
@@ -453,7 +453,7 @@ void lb_finalize() {
 /***********************************************************************/
 
 void write_profile(int write_halo) {
-  int i, x, y, xl, xh, yl, yh, xoff;
+  int x, y, xl, xh, yl, yh, xoff;
   double rho, j[lbmodel.n_dim];
   double *m = lbf + lblattice.halo_grid_volume*lbmodel.n_vel;
   FILE *file;
