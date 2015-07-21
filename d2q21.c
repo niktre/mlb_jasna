@@ -45,7 +45,7 @@ static double PFI;
 
 void lb_halo_copy() {
 
-  int x, y;
+  int x;
   int lsrc, rsrc, ldst, rdst, size;
 
   int totalsize = lbmodel.n_vel*lblattice.halo_grid_volume;
@@ -125,7 +125,7 @@ static void lb_calc_modes(double *f) {
 
 /***********************************************************************/
 
-static void lb_calc_equilibrium(double *f, double *f_eq) {
+static void lb_calc_equilibrium(double *f_eq, double *f, double *force) {
 
   int i;
   double w[lbmodel.n_vel];
@@ -133,13 +133,13 @@ static void lb_calc_equilibrium(double *f, double *f_eq) {
   double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
 
   rho  = m[0];
-  u[0] = m[1]/rho;
-  u[1] = m[2]/rho;
-  u2   = (u[0]*u[0] + u[1]*u[1])/cs2;
+  u[0] = (m[1] + 0.5*force[0])/rho;
+  u[1] = (m[2] + 0.5*force[1])/rho;
 
   cs2 = eq_state(rho);
-
   lb_weights(w, cs2);
+
+  u2   = (u[0]*u[0] + u[1]*u[1])/cs2;
 
   for (i=0; i<lbmodel.n_vel; ++i) {
     uc = (u[0]*lbmodel.c[i][0] + u[1]*lbmodel.c[i][1])/cs2;
@@ -150,15 +150,15 @@ static void lb_calc_equilibrium(double *f, double *f_eq) {
 
 /***********************************************************************/
 
-static void lb_bulk_collisions(double *f) {
+static void lb_bulk_collisions(double *f, double *force) {
 
   int i;
   double f_eq[lbmodel.n_vel];
   
-  lb_calc_equilibrium(f, f_eq);
+  lb_calc_equilibrium(f_eq, f, force);
 
   for (i=0; i<lbmodel.n_vel; ++i) {
-    f[i] = f_eq[i] + lbpar.gamma * ( f[i] - f_eq[i] );
+    f[i] += (lbpar.gamma - 1.) * ( f[i] - f_eq[i] );
   }
   
 }
@@ -167,9 +167,15 @@ static void lb_bulk_collisions(double *f) {
 
 static void lb_collisions(double *f, int x, int y) {
 
-  lb_bulk_collisions(f);
+  double force[lbmodel.n_dim];
 
-  mlb_interface_collisions(f, x, y);
+  force[0] = force[1] = 0.0;
+
+  mlb_calc_force(force, f, x, y);
+
+  lb_bulk_collisions(f, force);
+
+  mlb_interface_collisions(f, force);
 
 }
 
@@ -333,22 +339,25 @@ static void lb_write_column(double *f, double PFI, int x) {
 /***********************************************************************/
 
 void lb_update() {
-  int x;
+  int x, xl, xh;
   int xstride = lblattice.stride[0]*lbmodel.n_vel;
   double *f   = lbf;
 
   lb_halo_copy(); /* need up to date moments in halo */
 
-  /* Columns in the lower halo will be read only */
-  for (x=0; x<lblattice.halo_size[0]; ++x, f+=xstride) {
+  xl = lblattice.halo_size[0]-VMAX;
+  xh = lblattice.halo_size[0]+lblattice.grid[0]+VMAX;
+
+  /* Columns in the lower range will be read only */
+  for (x=xl, f+=xl*xstride; x<xl+2*VMAX; ++x, f+=xstride) {
     lb_read_column(f, fi, x);
   }
 
-  /* Collide and stream column x, read back column x-HALO
-   * x-HALO can be overwritten and all info is available now */
-  for (x=lblattice.halo_size[0]; x<lblattice.halo_grid[0]; ++x, f+=xstride) {
+  /* Collide and stream column x, read back column x-MAXV
+   * x-MAXV can be overwritten and all info is available now */
+  for (x=xl+2*VMAX; x<xh; ++x, f+=xstride) {
     lb_read_column(f, fi, x);
-    lb_write_column(f-HALO*xstride, fi, x-HALO);
+    lb_write_column(f-VMAX*xstride, fi, x-VMAX);
   }
 
 }
@@ -356,7 +365,7 @@ void lb_update() {
 /***********************************************************************/
 
 static void lb_init_fluid() {
-  int x, y, z, i;
+  int x, y, i;
   double  cs2, w[lbmodel.n_vel];
   double *f = lbf;
 
@@ -367,10 +376,10 @@ static void lb_init_fluid() {
   for (x=0; x<lblattice.halo_grid[0]; ++x) {
     for (y=0; y<lblattice.halo_grid[1]; ++y, f+=lbmodel.n_vel) {
       for (i=0; i<lbmodel.n_vel; ++i) {
-	if (x==lblattice.halo_size[0]+2 && y==lblattice.halo_size[1]+3) {
-	  f[i] = w[i]*lbpar.rho*2;
+	if (x<lblattice.halo_grid[0]/2 && y<lblattice.halo_grid[1]/2) {
+	  f[i] = w[i]*lbpar.rho*1.4;
 	} else {
-	  f[i] = w[i]*lbpar.rho;
+	  f[i] = w[i]*lbpar.rho*1.2;
 	}
       }
       lb_calc_modes(f);
@@ -382,7 +391,7 @@ static void lb_init_fluid() {
 /***********************************************************************/
 
 static void lb_init_lattice(int *grid) {
-  int i, x, y, hgrid[lbmodel.n_dim], hsize[lbmodel.n_dim];
+  int i, x, hgrid[lbmodel.n_dim], hsize[lbmodel.n_dim];
 
   lblattice.grid[0] = grid[0];
   lblattice.grid[1] = grid[1];
@@ -404,24 +413,26 @@ static void lb_init_lattice(int *grid) {
     for (x=0; x<WGRID; ++x) {
       FI(i,x) = calloc(lblattice.halo_grid[1],sizeof(*FI(0,0)));
     }
+    lblattice.nb_offset[i] = (int)lbmodel.c[i][0]*hgrid[1]+(int)lbmodel.c[i][1];
   }
 
 }
 
 /***********************************************************************/
 
-static void lb_init_parameters(double rho, double gamma) {
+static void lb_init_parameters(double rho, double gamma, double kappa) {
 
   lbpar.rho   = rho;
   lbpar.gamma = gamma;
+  lbpar.kappa = kappa;
 
 }
 
 /***********************************************************************/
 
-void lb_init(int *grid, double rho, double gamma) {
+void lb_init(int *grid, double rho, double gamma, double kappa) {
 
-  lb_init_parameters(rho, gamma);
+  lb_init_parameters(rho, gamma, kappa);
 
   lb_init_lattice(grid);
 
@@ -432,7 +443,7 @@ void lb_init(int *grid, double rho, double gamma) {
 /***********************************************************************/
 
 void lb_finalize() {
-  int i, x, y;
+  int i, x;
 
   for (i=0; i<lbmodel.n_vel; ++i) {
     for (x=0; x<WGRID; ++x) {
@@ -447,7 +458,7 @@ void lb_finalize() {
 /***********************************************************************/
 
 void write_profile(int write_halo) {
-  int i, x, y, xl, xh, yl, yh, xoff;
+  int x, y, xl, xh, yl, yh, xoff;
   double rho, j[lbmodel.n_dim];
   double *m = lbf + lblattice.halo_grid_volume*lbmodel.n_vel;
   FILE *file;
@@ -487,7 +498,7 @@ void write_profile(int write_halo) {
 #if 1
 int main(int argc, char *argv[]) {
   int i, n_steps, grid[lbmodel.n_dim], vol;
-  double rho, gamma;
+  double rho, gamma, kappa;
   double start, finish, elapsed, mups;
 
   if (argc!=2) {
@@ -497,15 +508,16 @@ int main(int argc, char *argv[]) {
 
   n_steps = atoi(argv[1]);
 
-  grid[0] = 10;
-  grid[1] = 10;
+  grid[0] = 20;
+  grid[1] = 20;
 
   vol = grid[0]*grid[1];
 
   rho   = 1.0;
   gamma = 0.0;
+  kappa = 0.1;
 
-  lb_init(grid,rho,gamma);
+  lb_init(grid,rho,gamma,kappa);
 
   fprintf(stdout, "Running  %d iterations\n", n_steps); fflush(stdout);
 

@@ -27,29 +27,35 @@
 
 #define NDIM 2
 #define NVEL 21
-#define HALO 4
-#define WGRID (2*HALO+1)
+#define NFD  13
+#define VMAX 4
+#define HALO 8
+#define WGRID (2*VMAX+1)
 
 /***********************************************************************/
 
 #define VELS(D,Q)    d##D##q##Q##_velocities
 #define WEIGHTS(D,Q) d##D##q##Q##_weights
 #define NORMS(D,Q)   d##D##q##Q##_norms
+#define FDW(D,M)     d##D##q##M##_fd_weights
 /* these macros are necessary to force prescan in the macro below */
 /* because prescan does not occur for stringify and concat */
-#define DnQm(D,Q)  { D, Q, VELS(D,Q) }
+#define DnQm(D,Q,M)  { D, Q, VELS(D,Q), M, FDW(D,M) }
 
 /***********************************************************************/
 
 typedef struct _LBpar {
   double rho;
   double gamma;
+  double kappa;
 } LB_Parameters;
 
 typedef const struct _LBmodel {
   const int n_dim;
   const int n_vel;
   const double (*c)[NDIM];
+  const int n_fd;
+  const double (*fd_weights)[NFD];
 } LB_Model;
 
 typedef struct _Lattice {
@@ -58,6 +64,7 @@ typedef struct _Lattice {
   int halo_size[NDIM];
   int stride[NDIM];
   int halo_grid_volume;
+  int nb_offset[NVEL];
 } LB_Lattice;
 
 /***********************************************************************/
@@ -86,7 +93,16 @@ static const double d2q21_velocities[21][2] = { {  0.,  0. },
 
 /***********************************************************************/
 
-static void lb_weights(double *w, double sigma2) {
+static const double d2q13_fd_weights[][13] = {
+  { 0., 2./3., 2./3., 2./3., 2./3., 0., 0., 0., 0., -1./24., -1./24., -1./24., -1./24. },
+  { -4., 1., 1., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0. },
+  {  0., 1., 1., 1., 1., 1./4., 1./4., 1./4., 1./4., 0., 0., 0., 0. },
+  {  0., -2., -2., -2., -2., 1./2., 1./2., 1./2., 1./2., 1./4., 1./4., 1./4., 1./4. }
+};
+
+/***********************************************************************/
+
+inline static void lb_weights(double *w, double sigma2) {
   int i;
 
   w[ 0] = 1. - 45./2.*sigma2*(7./60. - 7./48.*sigma2 + sigma2*sigma2/16.);
@@ -108,7 +124,7 @@ static void lb_weights(double *w, double sigma2) {
 
 /***********************************************************************/
 
-static const LB_Model lbmodel = DnQm(NDIM,NVEL);
+static const LB_Model lbmodel = DnQm(NDIM,NVEL,NFD);
 
 LB_Lattice lblattice;
 
