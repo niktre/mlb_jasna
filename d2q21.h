@@ -27,8 +27,9 @@
 
 #define NDIM 2
 #define NVEL 21
-#define HALO 4
-#define WGRID (2*HALO+1)
+#define VMAX 4
+#define HALO 8
+#define WGRID (2*VMAX+1)
 
 /***********************************************************************/
 

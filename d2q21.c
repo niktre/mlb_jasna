@@ -339,22 +339,25 @@ static void lb_write_column(double *f, double PFI, int x) {
 /***********************************************************************/
 
 void lb_update() {
-  int x;
+  int x, xl, xh;
   int xstride = lblattice.stride[0]*lbmodel.n_vel;
   double *f   = lbf;
 
   lb_halo_copy(); /* need up to date moments in halo */
 
-  /* Columns in the lower halo will be read only */
-  for (x=0; x<lblattice.halo_size[0]; ++x, f+=xstride) {
+  xl = lblattice.halo_size[0]-VMAX;
+  xh = lblattice.halo_size[0]+lblattice.grid[0]+VMAX;
+
+  /* Columns in the lower range will be read only */
+  for (x=xl, f+=xl*xstride; x<xl+2*VMAX; ++x, f+=xstride) {
     lb_read_column(f, fi, x);
   }
 
-  /* Collide and stream column x, read back column x-HALO
-   * x-HALO can be overwritten and all info is available now */
-  for (x=lblattice.halo_size[0]; x<lblattice.halo_grid[0]; ++x, f+=xstride) {
+  /* Collide and stream column x, read back column x-MAXV
+   * x-MAXV can be overwritten and all info is available now */
+  for (x=xl+2*VMAX; x<xh; ++x, f+=xstride) {
     lb_read_column(f, fi, x);
-    lb_write_column(f-HALO*xstride, fi, x-HALO);
+    lb_write_column(f-VMAX*xstride, fi, x-VMAX);
   }
 
 }
