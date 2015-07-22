@@ -3,8 +3,8 @@
 
 void firstDer (double, double *, int, int, int, int);
 void secDerAA (double, double *, int, int, int);
-void secDerAB (double, double *, int, int, int);
-void thirdDer (double, double *, int, int, int);
+void secDerAB (double, double *, int, int, int, int, int);
+void thirdDer (double, double *, int, int, int, int);
 
 /***********************************************************************/
 

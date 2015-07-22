@@ -3,52 +3,67 @@
 #include "defs.h"
 
 void firstDer (double res, double *f, int field_offset, int x, int y, int dir) {
+  const double *tau = lbmodel.fd_weights[0];
 	const double (*c)[lbmodel.n_dim] = lbmodel.c;
 	double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
 	int i;
+	double field;
 
+	res = 0.;
+	
+	for (i=0; i<lbmodel.n_fd; ++i) {
+//		field = (m + lblattice.nb_offset[i]*lbmodel.n_vel)[field_offset];
+		field = *(m + lblattice.nb_offset[i]*lbmodel.n_vel + field_offset);
+		res += tau[i]*c[i][dir]*field;
+	}
+}
+
+/***********************************************************************/
+
+void secDerAA (double res, double *f, int field_offset, int x, int y) {
+  const double *tau = lbmodel.fd_weights[1];
+	double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
+	int i;
 	double field;
 	res = 0.;
 	
 	for (i=0; i<lbmodel.n_fd; ++i) {
-		// do not know what field will be needed. Therefore, field_offset is added.
-		// if rho is needed then field_offset is 0, ux 1, uy 2, etc.
-		// NOT sure that the next pointer is correct!!!
-		field = *(m + (lblattice.nb_offset[i]+field_offset)*lbmodel.n_vel);
-		res += tau_derFirst[i]*c[i][dir]*field;
+		field = *(m + lblattice.nb_offset[i]*lbmodel.n_vel + field_offset);
+		res += tau[i]*field;
 	}
 }
 
 /***********************************************************************/
 
-void secDerAA (double res, double *field, int x, int y, int dir) {
+void secDerAB (double res, double *f, int field_offset, int x, int y, int dir1, int dir2) {
+	const double *tau = lbmodel.fd_weights[2];
+	const double (*c)[lbmodel.n_dim] = lbmodel.c;
+	double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
 	int i;
+	double field;
+	
 	res = 0.;
 	
 	for (i=0; i<lbmodel.n_fd; ++i) {
-		res += tau_derFirst[i]*lbmodel.c[i][dir]*field[i];
+		field = *(m + lblattice.nb_offset[i]*lbmodel.n_vel + field_offset);
+		res += tau[i]*c[i][dir1]*c[i][dir2]*field;
 	}
 }
 
 /***********************************************************************/
 
-void secDerAB (double res, double *field, int x, int y, int dir) {
+void thirdDer (double res, double *f, int field_offset, int x, int y, int dir) {
+	const double *tau = lbmodel.fd_weights[3];
+	const double (*c)[lbmodel.n_dim] = lbmodel.c;
+	double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
 	int i;
+	double field;
+	
 	res = 0.;
 	
 	for (i=0; i<lbmodel.n_fd; ++i) {
-		res += tau_derFirst[i]*lbmodel.c[i][dir]*field[i];
-	}
-}
-
-/***********************************************************************/
-
-void thirdDer (double res, double *field, int x, int y, int dir) {
-	int i;
-	res = 0.;
-	
-	for (i=0; i<lbmodel.n_fd; ++i) {
-		res += tau_derFirst[i]*lbmodel.c[i][dir]*field[i];
+		field = *(m + lblattice.nb_offset[i]*lbmodel.n_vel + field_offset);
+		res += tau[i]*c[i][dir]*field;
 	}
 }
 
