@@ -7,8 +7,9 @@
  *
  ***********************************************************************/
 
-#include "defs.h"
-
+//#include "defs.h"
+#include <math.h>
+#include "d2q21.h"
 /***********************************************************************/
 
 void mlb_calc_force(double *force, double *f, int x, int y) {
@@ -38,7 +39,7 @@ void mlb_interface_collisions(double *f, double *force) {
   double rho, cs2, fc;
   double w[lbmodel.n_vel];
 
-  rho = RHO_MEAN;
+  rho = lbpar.rho;
   cs2 = eq_state(rho);
   lb_weights(w, cs2);
 
@@ -47,6 +48,25 @@ void mlb_interface_collisions(double *f, double *force) {
     f[i] += 0.5*(1. + lbpar.gamma)*w[i]/cs2*fc;
   }
 
+}
+
+/***********************************************************************/
+
+double eq_state(double rho){
+	double sigma=0.0;
+	double integral=0.0;
+	
+	if(rho <= R1 || rho >= R3 ){
+		integral = 0.0;
+	}
+	else if(R1 < rho && rho < R3){
+		integral = 2*A*(R2-R1)/M_PI*sin(0.5*M_PI*(rho-2*R1+R0)/(R2-R1))*sin(0.5*M_PI*(rho-R0)/(R2-R1));
+	} else {
+		printf ("I've lost myself in the EOS!\n");
+		exit (0);
+	}
+	sigma= S1 * exp(integral);
+	return sigma;
 }
 
 /***********************************************************************/

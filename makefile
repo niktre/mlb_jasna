@@ -5,11 +5,11 @@ CLEANNAME = clean
 CC = gcc
 LFLAGS += -lm
 
-HEADERS = mlb.h d2q21.h defs.h derivFD.h
+HEADERS = mlb.h d2q21.h derivFD.h
 
-SOURCE = mlb.c derivFD.c d2q21.c fbgk6.c general.c derivatives.c
+SOURCE = mlb.c derivFD.c d2q21.c
 
-OBJECT = mlb.o derivFD.o d2q21.o fbgk6.o general.o derivatives.o
+OBJECT = mlb.o derivFD.o d2q21.o 
 
 FILES = output/*
 

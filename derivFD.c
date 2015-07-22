@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include "derivFD.h"
-#include "defs.h"
+#include "d2q21.h"
+//#include "defs.h"
 
 void firstDer (double res, double *f, int field_offset, int x, int y, int dir) {
   const double *tau = lbmodel.fd_weights[0];

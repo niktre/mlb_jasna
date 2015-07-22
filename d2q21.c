@@ -28,7 +28,7 @@
 #include "d2q21.h"
 #include "mlb.h"
 #include "derivFD.h"
-#include "defs.h"
+//#include "defs.h"
 
 /***********************************************************************/
 
@@ -377,9 +377,9 @@ static void lb_init_fluid() {
     for (y=0; y<lblattice.halo_grid[1]; ++y, f+=lbmodel.n_vel) {
       for (i=0; i<lbmodel.n_vel; ++i) {
 	if (x<lblattice.halo_grid[0]/2 && y<lblattice.halo_grid[1]/2) {
-	  f[i] = w[i]*lbpar.rho*1.4;
-	} else {
 	  f[i] = w[i]*lbpar.rho*1.2;
+	} else {
+	  f[i] = w[i]*lbpar.rho*0.8;
 	}
       }
       lb_calc_modes(f);
@@ -515,7 +515,7 @@ int main(int argc, char *argv[]) {
 
   rho   = 1.0;
   gamma = 0.0;
-  kappa = 0.1;
+  kappa = .0001;
 
   lb_init(grid,rho,gamma,kappa);
 
