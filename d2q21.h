@@ -45,7 +45,6 @@
 /***********************************************************************/
 
 typedef struct _LBpar {
-  double rho;
   double gamma;
   double kappa;
 } LB_Parameters;
