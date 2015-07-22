@@ -368,18 +368,22 @@ static void lb_init_fluid() {
   int x, y, i;
   double  cs2, w[lbmodel.n_vel];
   double *f = lbf;
+  double rho1, rho2;
 
-  cs2 = eq_state(lbpar.rho);
-
-  lb_weights(w, cs2);
+  rho1 = 1.4;
+  rho2 = 1.2;
 
   for (x=0; x<lblattice.halo_grid[0]; ++x) {
     for (y=0; y<lblattice.halo_grid[1]; ++y, f+=lbmodel.n_vel) {
       for (i=0; i<lbmodel.n_vel; ++i) {
 	if (x<lblattice.halo_grid[0]/2 && y<lblattice.halo_grid[1]/2) {
-	  f[i] = w[i]*lbpar.rho*1.4;
+	  cs2 = eq_state(rho1);
+	  lb_weights(w, cs2);
+	  f[i] = w[i]*rho1;
 	} else {
-	  f[i] = w[i]*lbpar.rho*1.2;
+	  cs2 = eq_state(rho2);
+	  lb_weights(w, cs2);
+	  f[i] = w[i]*rho2;
 	}
       }
       lb_calc_modes(f);
@@ -422,7 +426,6 @@ static void lb_init_lattice(int *grid) {
 
 static void lb_init_parameters(double rho, double gamma, double kappa) {
 
-  lbpar.rho   = rho;
   lbpar.gamma = gamma;
   lbpar.kappa = kappa;
 
@@ -501,12 +504,12 @@ int main(int argc, char *argv[]) {
   double rho, gamma, kappa;
   double start, finish, elapsed, mups;
 
-  if (argc!=2) {
-    fprintf(stderr, "Usage: ./run <nsteps>\n");
+  if (argc!=3) {
+    fprintf(stderr, "Usage: ./run <kappa> <nsteps>\n");
     return -1;
   }	   
 
-  n_steps = atoi(argv[1]);
+  n_steps = atoi(argv[2]);
 
   grid[0] = 20;
   grid[1] = 20;
@@ -515,7 +518,7 @@ int main(int argc, char *argv[]) {
 
   rho   = 1.0;
   gamma = 0.0;
-  kappa = 0.1;
+  kappa = atof(argv[1]);
 
   lb_init(grid,rho,gamma,kappa);
 
