@@ -1,12 +1,10 @@
 #ifndef _DERIVFD_H
 #define _DERIVFD_H
 
-#define NFORCE 13
-
-void firstDer (double, double *, int, int, int);
+void firstDer (double, double *, int, int, int, int);
 void secDerAA (double, double *, int, int, int);
-void secDerAB (double, double *, int, int, int);
-void thirdDer (double, double *, int, int, int);
+void secDerAB (double, double *, int, int, int, int, int);
+void thirdDer (double, double *, int, int, int, int);
 
 /***********************************************************************/
 
