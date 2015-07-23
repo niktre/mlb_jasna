@@ -50,8 +50,8 @@ static void mlb_calc_current(double *jc, double *m, int x, int y) {
   firstDer(Dpmrdp, pmrdp);
   firstDer(Du[0], &u[0]);
   firstDer(Du[1], &u[1]);
-  secDerAB(Du[0], &u[0]);
-  secDerAB(Du[1], &u[1]);
+  secDerAB(D2u[0], &u[0]);
+  secDerAB(D2u[1], &u[1]);
 
   divu = Du[0][0] + Du[1][1];
 

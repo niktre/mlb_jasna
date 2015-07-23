@@ -49,7 +49,7 @@ void secDerAB (double *res, double *m) {
     field = m[lblattice.nb_offset[i]*lbmodel.n_vel];
     for (j=0; j<lbmodel.n_dim; ++j) {
       for (k=0; k<=j; ++k) {
-	res[j*lbmodel.n_dim+k] += tau[i]*c[i][j]*c[i][k]*field;
+	res[j*(j+1)/2+k] += tau[i]*c[i][j]*c[i][k]*field;
       }
     }
   }
@@ -57,7 +57,7 @@ void secDerAB (double *res, double *m) {
   secDerAA(&trace, m);
 
   for (j=0; j<lbmodel.n_dim; ++j) {
-    res[j*lbmodel.n_dim+j] += trace/lbmodel.n_dim;
+    res[j*(j+3)/2] += trace/lbmodel.n_dim;
   }
 
 }
