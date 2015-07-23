@@ -3,6 +3,7 @@ NAME = run
 CLEANNAME = clean
 
 CC = gcc
+CFLAGS += -Wall
 LFLAGS += -lm
 
 HEADERS = mlb.h d2q21.h defs.h derivFD.h
