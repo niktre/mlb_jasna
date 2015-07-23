@@ -359,7 +359,8 @@ static void lb_collide_stream(double *f) {
 
 /***********************************************************************/
 
-static void lb_update(double *f) {
+static void lb_update() {
+  double *f = lbf;
   double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
 
   mlb_correction_current(m);
@@ -532,7 +533,7 @@ int main(int argc, char *argv[]) {
 
   start = (double) clock();
   for (i=0; i<n_steps; ++i) {
-    lb_update(lbf);
+    lb_update();
   }
   finish = (double) clock();
 
