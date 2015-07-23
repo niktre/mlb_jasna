@@ -103,7 +103,7 @@ void lb_halo_copy() {
 
 /***********************************************************************/
 
-static void lb_calc_modes(double *f) {
+static void lb_calc_moments(double *f) {
 
   int i;
   double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
@@ -302,7 +302,7 @@ static void lb_read(double *f, double PFI, int x, int y) {
 static void lb_write(double *f, double PFI, int x, int y) {
 
   lb_write_back(f, fi, x, y);
-  lb_calc_modes(f);
+  lb_calc_moments(f);
 
 }
 
@@ -338,10 +338,9 @@ static void lb_write_column(double *f, double PFI, int x) {
 
 /***********************************************************************/
 
-void lb_update() {
+static void lb_collide_stream(double *f) {
   int x, xl, xh;
   int xstride = lblattice.stride[0]*lbmodel.n_vel;
-  double *f   = lbf;
 
   lb_halo_copy(); /* need up to date moments in halo */
 
@@ -359,6 +358,16 @@ void lb_update() {
     lb_read_column(f, fi, x);
     lb_write_column(f-VMAX*xstride, fi, x-VMAX);
   }
+
+}
+
+/***********************************************************************/
+
+static void lb_update(double *f) {
+
+  mlb_implicit_current(f);
+
+  lb_collide_stream(f);
 
 }
 
@@ -386,7 +395,7 @@ static void lb_init_fluid() {
 	  f[i] = w[i]*rho2;
 	}
       }
-      lb_calc_modes(f);
+      lb_calc_moments(f);
     }
   }
 
@@ -526,7 +535,7 @@ int main(int argc, char *argv[]) {
 
   start = (double) clock();
   for (i=0; i<n_steps; ++i) {
-    lb_update();
+    lb_update(lbf);
   }
   finish = (double) clock();
 

@@ -129,6 +129,8 @@ LB_Lattice lblattice;
 
 LB_Parameters lbpar;
 
+void lb_halo_copy();
+
 /***********************************************************************/
 
 #endif
