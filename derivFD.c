@@ -64,19 +64,21 @@ void secDerAB (double *res, double *m) {
 
 /***********************************************************************/
 
-void thirdDer (double res, double *f, int field_offset, int x, int y, int dir) {
-	const double *tau = lbmodel.fd_weights[3];
-	const double (*c)[lbmodel.n_dim] = lbmodel.c;
-	double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
-	int i;
-	double field;
+void thirdDer (double *res, double *m) {
+  const double *tau = lbmodel.fd_weights[3];
+  const double (*c)[lbmodel.n_dim] = lbmodel.c;
+  int i, j;
+  double field;
 	
-	res = 0.;
-	
-	for (i=0; i<lbmodel.n_fd; ++i) {
-		field = *(m + lblattice.nb_offset[i]*lbmodel.n_vel + field_offset);
-		res += tau[i]*c[i][dir]*field;
-	}
+  for (j=0; j<lbmodel.n_dim; ++j) res[j] = 0.;
+
+  for (i=0; i<lbmodel.n_fd; ++i) {
+    field = m[lblattice.nb_offset[i]*lbmodel.n_vel];
+    for (j=0; j<lbmodel.n_dim; ++j) {
+      res[j] += tau[i]*c[i][j]*field;
+    }
+  }
+
 }
 
 /***********************************************************************/

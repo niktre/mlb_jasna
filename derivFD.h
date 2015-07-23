@@ -4,7 +4,7 @@
 void firstDer (double *, double *);
 void secDerAA (double *, double *);
 void secDerAB (double *, double *);
-void thirdDer (double, double *, int, int, int, int);
+void thirdDer (double *, double *);
 
 /***********************************************************************/
 
