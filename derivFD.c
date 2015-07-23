@@ -2,52 +2,64 @@
 #include "derivFD.h"
 #include "defs.h"
 
-void firstDer (double res, double *f, int field_offset, int x, int y, int dir) {
+void firstDer (double *res, double *m) {
   const double *tau = lbmodel.fd_weights[0];
-	const double (*c)[lbmodel.n_dim] = lbmodel.c;
-	double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
-	int i;
-	double field;
+  const double (*c)[lbmodel.n_dim] = lbmodel.c;
+  int i, j;
+  double field;
 
-	res = 0.;
-	
-	for (i=0; i<lbmodel.n_fd; ++i) {
-//		field = (m + lblattice.nb_offset[i]*lbmodel.n_vel)[field_offset];
-		field = *(m + lblattice.nb_offset[i]*lbmodel.n_vel + field_offset);
-		res += tau[i]*c[i][dir]*field;
-	}
+  for (j=0; j<lbmodel.n_dim; ++j) res[j] = 0.;
+
+  for (i=0; i<lbmodel.n_fd; ++i) {
+    field = m[lblattice.nb_offset[i]*lbmodel.n_vel];
+    for (j=0; j<lbmodel.n_dim; ++j) {
+      res[j] += tau[i]*c[i][j]*field;
+    }
+  }
+
 }
 
 /***********************************************************************/
 
-void secDerAA (double res, double *f, int field_offset, int x, int y) {
+void secDerAA (double *res, double *m) {
   const double *tau = lbmodel.fd_weights[1];
-	double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
-	int i;
-	double field;
-	res = 0.;
+  int i;
+  double field;
+
+  *res = 0.;
 	
-	for (i=0; i<lbmodel.n_fd; ++i) {
-		field = *(m + lblattice.nb_offset[i]*lbmodel.n_vel + field_offset);
-		res += tau[i]*field;
-	}
+  for (i=0; i<lbmodel.n_fd; ++i) {
+    field = m[lblattice.nb_offset[i]*lbmodel.n_vel];
+    *res += tau[i]*field;
+  }
+
 }
 
 /***********************************************************************/
 
-void secDerAB (double res, double *f, int field_offset, int x, int y, int dir1, int dir2) {
-	const double *tau = lbmodel.fd_weights[2];
-	const double (*c)[lbmodel.n_dim] = lbmodel.c;
-	double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
-	int i;
-	double field;
+void secDerAB (double *res, double *m) {
+  const double *tau = lbmodel.fd_weights[2];
+  const double (*c)[lbmodel.n_dim] = lbmodel.c;
+  int i, j, k;
+  double field, trace;
+
+  for (j=0; j<lbmodel.n_dim*(lbmodel.n_dim+1)/2; ++j) res[j] = 0.;
 	
-	res = 0.;
-	
-	for (i=0; i<lbmodel.n_fd; ++i) {
-		field = *(m + lblattice.nb_offset[i]*lbmodel.n_vel + field_offset);
-		res += tau[i]*c[i][dir1]*c[i][dir2]*field;
-	}
+  for (i=0; i<lbmodel.n_fd; ++i) {
+    field = m[lblattice.nb_offset[i]*lbmodel.n_vel];
+    for (j=0; j<lbmodel.n_dim; ++j) {
+      for (k=0; k<=j; ++k) {
+	res[j*lbmodel.n_dim+k] += tau[i]*c[i][j]*c[i][k]*field;
+      }
+    }
+  }
+
+  secDerAA(&trace, m);
+
+  for (j=0; j<lbmodel.n_dim; ++j) {
+    res[j*lbmodel.n_dim+j] += trace/lbmodel.n_dim;
+  }
+
 }
 
 /***********************************************************************/

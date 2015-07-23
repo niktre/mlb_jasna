@@ -1,9 +1,9 @@
 #ifndef _DERIVFD_H
 #define _DERIVFD_H
 
-void firstDer (double, double *, int, int, int, int);
-void secDerAA (double, double *, int, int, int);
-void secDerAB (double, double *, int, int, int, int, int);
+void firstDer (double *, double *);
+void secDerAA (double *, double *);
+void secDerAB (double *, double *);
 void thirdDer (double, double *, int, int, int, int);
 
 /***********************************************************************/
