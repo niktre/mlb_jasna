@@ -135,6 +135,10 @@ static void lb_calc_equilibrium(double *f_eq, double *f, double *force) {
   rho  = m[0];
   u[0] = (m[1] + 0.5*force[0])/rho;
   u[1] = (m[2] + 0.5*force[1])/rho;
+  //u[0] = (m[1] + 0.5*m[10])/rho;
+  //u[1] = (m[2] + 0.5*m[11])/rho;
+  //u[0] = m[12];
+  //u[1] = m[13];
 
   cs2 = eq_state(rho);
   lb_weights(w, cs2);
@@ -166,12 +170,10 @@ static void lb_bulk_collisions(double *f, double *force) {
 /***********************************************************************/
 
 static void lb_collisions(double *f, int x, int y) {
-
+  double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
   double force[lbmodel.n_dim];
 
-  force[0] = force[1] = 0.0;
-
-  mlb_calc_force(force, f, x, y);
+  mlb_calc_force(force, m, x, y);
 
   lb_bulk_collisions(f, force);
 
@@ -364,8 +366,9 @@ static void lb_collide_stream(double *f) {
 /***********************************************************************/
 
 static void lb_update(double *f) {
+  double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
 
-  mlb_implicit_current(f);
+  mlb_correction_current(m);
 
   lb_collide_stream(f);
 
