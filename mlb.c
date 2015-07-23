@@ -200,9 +200,10 @@ void mlb_correction_current(double *m0) {
 
 /***********************************************************************/
 
-void mlb_interface_collisions(double *f, double *force) {
+void mlb_interface_collisions(double *f) {
   int i;
-  double rho, cs2, fc;
+  double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
+  double rho, cs2, fc, *force = m + 10;
   double w[lbmodel.n_vel];
 
   rho = RHO_MEAN;
