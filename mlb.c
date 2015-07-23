@@ -70,8 +70,8 @@ static void mlb_calc_current(double *jc, double *m, int x, int y) {
   jc[0] *= - 1./12.;
   jc[1] *= - 1./12.;
 
-  jc[0] = 0.0;
-  jc[1] = 0.0;
+  //jc[0] = 0.0;
+  //jc[1] = 0.0;
 
 }
 
@@ -197,11 +197,11 @@ void mlb_correction_current(double *m0) {
 
   do {
 
-    m = m0;
-
-    ++niter;
+    m = m0; dmax = 0.0; ++niter;
 
     lb_halo_copy(); /* need up to date currents in halo */
+
+    //fprintf(stderr, "Starting iteration #%d of implicit algorithm...\n", niter);
 
     /* no information is `streaming' so we loop the internal region */
     xl = lblattice.halo_size[0];
@@ -224,7 +224,7 @@ void mlb_correction_current(double *m0) {
       ic_write_column(m-VMAX*xstride, x-VMAX);
     }
 
-    fprintf(stderr, "Iteration #%d: dmax = %f\n", niter, dmax);
+    //fprintf(stderr, "Iteration #%d: dmax = %f\n", niter, dmax);
 
   } while (dmax > TOLERANCE);
 
@@ -247,6 +247,28 @@ void mlb_interface_collisions(double *f) {
   for (i=0; i<lbmodel.n_vel; ++i) {
     fc = lbmodel.c[i][0]*force[0] + lbmodel.c[i][1]*force[1];
     f[i] += 0.5*(1. + lbpar.gamma)*w[i]/cs2*fc;
+  }
+
+}
+
+/***********************************************************************/
+
+void mlc_correction_collisions(double *f) {
+  const double (*c)[lbmodel.n_dim] = lbmodel.c;
+  int i;
+  double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
+  double rho, cs2, jc;
+  double w[lbmodel.n_vel];
+
+  double *jcorr = m + 14;
+
+  rho = m[0];
+  cs2 = eq_state(rho);
+  lb_weights(w, cs2);
+
+  for (i=0; i<lbmodel.n_vel; ++i) {
+    jc = c[i][0]*jcorr[0] + c[i][1]*jcorr[1];
+    f[i] += (lbpar.gamma - 1.)*w[i]/cs2*jc;
   }
 
 }
