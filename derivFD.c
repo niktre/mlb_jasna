@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include "derivFD.h"
 #include "defs.h"
 
@@ -54,11 +55,17 @@ void secDerAB (double *res, double *m) {
     }
   }
 
+  trace = res[0] + res[2];
+
+  fprintf(stderr, "trace=%f\t", trace);
+
   secDerAA(&trace, m);
 
-  for (j=0; j<lbmodel.n_dim; ++j) {
-    res[j*(j+3)/2] += trace/lbmodel.n_dim;
-  }
+  fprintf(stderr, "%f\n", trace);
+
+  //for (j=0; j<lbmodel.n_dim; ++j) {
+  //  res[j*(j+3)/2] += trace/lbmodel.n_dim;
+  //}
 
 }
 
