@@ -67,6 +67,9 @@ static void mlb_calc_current(double *jc, double *m, int x, int y) {
   jc[0] += *p * (D2u[0][0] + D2u[0][2]);
   jc[1] += *p * (D2u[1][0] + D2u[1][2]);
 
+  jc[0] *= - 1./12.;
+  jc[1] *= - 1./12.;
+
   jc[0] = 0.0;
   jc[1] = 0.0;
 
