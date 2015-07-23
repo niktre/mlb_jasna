@@ -107,6 +107,7 @@ static void lb_calc_moments(double *f) {
 
   int i;
   double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
+  double rho, p, dp, d2p;
 
   for (i=0; i<lbmodel.n_vel; ++i) {
     m[i] = 0.0;
@@ -120,6 +121,30 @@ static void lb_calc_moments(double *f) {
     m[4] += f[i]*lbmodel.c[i][1]*lbmodel.c[i][1];
     m[5] += f[i]*lbmodel.c[i][0]*lbmodel.c[i][1];
   }
+
+  /* evaluate equation of state */
+  rho = m[0];
+  p   = rho*eq_state(rho);
+  dp  = derP(rho);
+  d2p = der2P(rho);
+
+  /* pressure and derivatives */
+  m[6] = p;
+  m[7] = dp;
+  m[8] = p - rho*dp;
+  m[9] = rho*d2p;
+
+  /* force */
+  m[10] = 0.0;
+  m[11] = 0.0;
+
+  /* velocity */
+  m[12] = m[1]/m[0];
+  m[13] = m[2]/m[0];
+
+  /* correction current */
+  m[14] = 0.0;
+  m[15] = 0.0;
 
 }
 
