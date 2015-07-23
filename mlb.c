@@ -10,8 +10,9 @@
 #include <math.h>
 #include <stdio.h>
 #include "defs.h"
+#include "derivFD.h"
 
-#define TOLERANCE 1.e-9
+#define TOLERANCE 1.e-3
 
 /***********************************************************************/
 
@@ -39,8 +40,36 @@ void mlb_calc_force(double *force, double *m, int x, int y) {
 /***********************************************************************/
 
 static void mlb_calc_current(double *jc, double *m, int x, int y) {
+  double Dp[2], Dpmrdp[2], Du[2][2], D2u[2][3], divu;
+
+  double *p     = m + 6;
+  double *pmrdp = m + 8;
+  double *u     = m + 12;
+
+  firstDer(Dp, p);
+  firstDer(Dpmrdp, pmrdp);
+  firstDer(Du[0], &u[0]);
+  firstDer(Du[1], &u[1]);
+  secDerAB(Du[0], &u[0]);
+  secDerAB(Du[1], &u[1]);
+
+  divu = Du[0][0] + Du[1][1];
+
+  jc[0] = Dpmrdp[0] * divu;
+  jc[1] = Dpmrdp[1] * divu;
+
+  jc[0] += Dp[0] * (Du[0][0] + Du[0][0]) + Dp[1] * (Du[0][1] + Du[1][0]);
+  jc[1] += Dp[0] * (Du[1][0] + Du[0][1]) + Dp[1] * (Du[1][1] + Du[1][1]);
+
+  jc[0] += (*pmrdp + *p) * (D2u[0][0] + D2u[1][1]);
+  jc[1] += (*pmrdp + *p) * (D2u[0][1] + D2u[1][2]);
+
+  jc[0] += *p * (D2u[0][0] + D2u[0][2]);
+  jc[1] += *p * (D2u[1][0] + D2u[1][2]);
+
   jc[0] = 0.0;
   jc[1] = 0.0;
+
 }
 
 /***********************************************************************/
@@ -192,9 +221,11 @@ void mlb_correction_current(double *m0) {
       ic_write_column(m-VMAX*xstride, x-VMAX);
     }
 
+    fprintf(stderr, "Iteration #%d: dmax = %f\n", niter, dmax);
+
   } while (dmax > TOLERANCE);
 
-  //fprintf(stderr, "Implicit algorithm converged after %d iteration(s).\n", niter);
+  fprintf(stderr, "Implicit algorithm converged after %d iteration(s).\n", niter);
 
 }
 
