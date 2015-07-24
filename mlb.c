@@ -253,7 +253,7 @@ void mlb_interface_collisions(double *f) {
 
 /***********************************************************************/
 
-void mlc_correction_collisions(double *f) {
+void mlb_correction_collisions(double *f) {
   const double (*c)[lbmodel.n_dim] = lbmodel.c;
   int i;
   double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;

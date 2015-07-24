@@ -13,4 +13,6 @@ void mlb_correction_current(double *m);
 
 void mlb_interface_collisions(double *f);
 
+void mlc_correction_collisions(double *f);
+
 /***********************************************************************/

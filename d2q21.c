@@ -198,6 +198,8 @@ static void lb_collisions(double *f, int x, int y) {
 
   mlb_interface_collisions(f);
 
+  mlb_correction_collisions(f);
+
 }
 
 /***********************************************************************/
