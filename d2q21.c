@@ -103,10 +103,11 @@ void lb_halo_copy() {
 
 /***********************************************************************/
 
-static void lb_calc_modes(double *f) {
+static void lb_calc_moments(double *f) {
 
   int i;
   double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
+  double rho, p, dp, d2p;
 
   for (i=0; i<lbmodel.n_vel; ++i) {
     m[i] = 0.0;
@@ -121,11 +122,35 @@ static void lb_calc_modes(double *f) {
     m[5] += f[i]*lbmodel.c[i][0]*lbmodel.c[i][1];
   }
 
+  /* evaluate equation of state */
+  rho = m[0];
+  p   = rho*eq_state(rho);
+  dp  = derP(rho);
+  d2p = der2P(rho);
+
+  /* pressure and derivatives */
+  m[6] = p;
+  m[7] = dp;
+  m[8] = p - rho*dp;
+  m[9] = rho*d2p;
+
+  /* force */
+  m[10] = 0.0;
+  m[11] = 0.0;
+
+  /* velocity */
+  m[12] = m[1]/m[0];
+  m[13] = m[2]/m[0];
+
+  /* correction current */
+  m[14] = 0.0;
+  m[15] = 0.0;
+
 }
 
 /***********************************************************************/
 
-static void lb_calc_equilibrium(double *f_eq, double *f, double *force) {
+static void lb_calc_equilibrium(double *f_eq, double *f) {
 
   int i;
   double w[lbmodel.n_vel];
@@ -133,8 +158,10 @@ static void lb_calc_equilibrium(double *f_eq, double *f, double *force) {
   double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
 
   rho  = m[0];
-  u[0] = (m[1] + 0.5*force[0])/rho;
-  u[1] = (m[2] + 0.5*force[1])/rho;
+  //u[0] = (m[1] + 0.5*force[0])/rho;
+  //u[1] = (m[2] + 0.5*force[1])/rho;
+  u[0] = m[12];
+  u[1] = m[13];
 
   cs2 = eq_state(rho);
   lb_weights(w, cs2);
@@ -150,12 +177,12 @@ static void lb_calc_equilibrium(double *f_eq, double *f, double *force) {
 
 /***********************************************************************/
 
-static void lb_bulk_collisions(double *f, double *force) {
+static void lb_bulk_collisions(double *f) {
 
   int i;
   double f_eq[lbmodel.n_vel];
   
-  lb_calc_equilibrium(f_eq, f, force);
+  lb_calc_equilibrium(f_eq, f);
 
   for (i=0; i<lbmodel.n_vel; ++i) {
     f[i] += (lbpar.gamma - 1.) * ( f[i] - f_eq[i] );
@@ -167,15 +194,11 @@ static void lb_bulk_collisions(double *f, double *force) {
 
 static void lb_collisions(double *f, int x, int y) {
 
-  double force[lbmodel.n_dim];
+  lb_bulk_collisions(f);
 
-  force[0] = force[1] = 0.0;
+  mlb_interface_collisions(f);
 
-  mlb_calc_force(force, f, x, y);
-
-  lb_bulk_collisions(f, force);
-
-  mlb_interface_collisions(f, force);
+  mlb_correction_collisions(f);
 
 }
 
@@ -302,7 +325,7 @@ static void lb_read(double *f, double PFI, int x, int y) {
 static void lb_write(double *f, double PFI, int x, int y) {
 
   lb_write_back(f, fi, x, y);
-  lb_calc_modes(f);
+  lb_calc_moments(f);
 
 }
 
@@ -338,10 +361,9 @@ static void lb_write_column(double *f, double PFI, int x) {
 
 /***********************************************************************/
 
-void lb_update() {
+static void lb_collide_stream(double *f) {
   int x, xl, xh;
   int xstride = lblattice.stride[0]*lbmodel.n_vel;
-  double *f   = lbf;
 
   lb_halo_copy(); /* need up to date moments in halo */
 
@@ -359,6 +381,18 @@ void lb_update() {
     lb_read_column(f, fi, x);
     lb_write_column(f-VMAX*xstride, fi, x-VMAX);
   }
+
+}
+
+/***********************************************************************/
+
+static void lb_update() {
+  double *f = lbf;
+  double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
+
+  mlb_correction_current(m);
+
+  lb_collide_stream(f);
 
 }
 
@@ -386,7 +420,7 @@ static void lb_init_fluid() {
 	  f[i] = w[i]*rho2;
 	}
       }
-      lb_calc_modes(f);
+      lb_calc_moments(f);
     }
   }
 
