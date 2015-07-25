@@ -40,7 +40,11 @@ void mlb_calc_force(double *force, double *m, int x, int y) {
 /***********************************************************************/
 
 static void mlb_calc_current(double *jc, double *m, int x, int y) {
-  double Dp[2], Dpmrdp[2], Du[2][2], D2u[2][2][2], divu;
+  double Dp[lbmodel.n_dim],
+    Dpmrdp[lbmodel.n_dim],
+    Du[lbmodel.n_dim][lbmodel.n_dim],
+    D2u[lbmodel.n_dim][lbmodel.n_dim][lbmodel.n_dim],
+    divu;
 
   double *p     = m + 6;
   double *pmrdp = m + 8;
@@ -253,23 +257,168 @@ void mlb_interface_collisions(double *f) {
 
 /***********************************************************************/
 
+inline static void mlb_calc_sigma(double Sigma[][lbmodel.n_dim], double *m) {
+  const double gamma = lbpar.gamma;
+  int i, j, k;
+
+  double Dr[lbmodel.n_dim],
+    Dp[lbmodel.n_dim],
+    Dpdu[lbmodel.n_dim],
+    Dpmrdp[lbmodel.n_dim],
+    Dpmrdpdivu[lbmodel.n_dim],
+    Drdpudu[lbmodel.n_dim][lbmodel.n_dim],
+    Du[lbmodel.n_dim][lbmodel.n_dim],
+    Dj[lbmodel.n_dim][lbmodel.n_dim],
+    D2p[lbmodel.n_dim][lbmodel.n_dim],
+    D2u[lbmodel.n_dim][lbmodel.n_dim][lbmodel.n_dim],
+    divu, divj;
+
+  double *rho   = m;
+  double *p     = m + 6;
+  double *dp    = m + 7;
+  double *pmrdp = m + 8;
+  double *rd2p  = m + 9;
+  double *u     = m + 12;
+
+  firstDer(Dr, rho);
+  firstDer(Dp, p);
+  firstDer(Dpmrdp, pmrdp);
+  firstDer(Du[0], &u[0]);
+  firstDer(Du[1], &u[1]);
+  firstDer(Dj[0], &m[1]);
+  firstDer(Dj[1], &m[2]);
+  secDerAB(D2p, p);
+  secDerAB(D2u[0], &u[0]);
+  secDerAB(D2u[1], &u[1]);
+
+  divu = Du[0][0] + Du[1][1];
+  divj = Dj[0][0] + Dj[1][1];
+
+  /* Step 10 and 11 */
+  for (i=0; i<lbmodel.n_dim; ++i) {
+    Dpdu[i] = ( Dp[0] * ( Du[0][1] + Du[1][0] )
+		+ *p * ( D2u[0][0][i] + D2u[1][1][i]
+			 + D2u[i][0][0] + D2u[i][1][1] ) );
+    Dpmrdpdivu[i] = Dpmrdp[i]*divu - *pmrdp*(D2u[0][i][0] + D2u[1][i][1]);
+    for (j=0; j<lbmodel.n_dim; ++j) {
+      Drdpudu[i][j] = ( D2p[i][j]/(*rho) - Dr[i]*Dp[j]/(*rho**rho)
+		       + Du[0][i]*Du[j][0] + Du[1][i]*Du[j][1]
+		       + u[0]*D2u[j][i][0] + u[1]*D2u[j][i][1] );
+      for (k=0; k<lbmodel.n_dim; ++k) {
+      }
+    }
+  }
+
+  /* calculate Sigma */
+  for (i=0; i<lbmodel.n_dim; ++i) {
+    for (j=0; j<lbmodel.n_dim; ++j) {
+      Sigma[i][j] = ( -0.25*(gamma+1.)*(gamma+1.)/(gamma-1.)
+		      * ( u[i]*Dpmrdpdivu[j] + u[j]*Dpmrdpdivu[i]
+			  + u[i]*Dpdu[j] + u[j]*Dpdu[i] )
+		      + (gamma*gamma + 4.*gamma + 1.)/(gamma-1.)/6.
+		      * ( *dp * divj * ( Du[i][j] + Du[j][i] )
+			  - *p * ( Drdpudu[i][j] + Drdpudu[j][i] ) ) );
+    }
+    Sigma[i][i] += ( (gamma*gamma + 4.*gamma + 1.)/(gamma-1.)/6.
+		     * ( - *pmrdp * ( Drdpudu[0][0] + Drdpudu[1][1] )
+			 + *rd2p * divu * divj ) );
+  }
+
+}
+
+/***********************************************************************/
+
+inline static void mlb_calc_xi(double Xi[][lbmodel.n_dim][lbmodel.n_dim],
+			       double *m) {
+  const double gamma = lbpar.gamma;
+  int i, j, k;
+
+  double Dr[lbmodel.n_dim],
+    Dp[lbmodel.n_dim],
+    Dpr[lbmodel.n_dim],
+    Du[lbmodel.n_dim][lbmodel.n_dim],
+    Dpuu[lbmodel.n_dim][lbmodel.n_dim][lbmodel.n_dim],
+    divu;
+
+  double *rho   = m;
+  double *p     = m + 6;
+  double *pmrdp = m + 8;
+  double *u     = m + 12;
+  double *jcorr = m + 14;
+
+  firstDer(Dr, rho);
+  firstDer(Dp, p);
+  firstDer(Du[0], &u[0]);
+  firstDer(Du[1], &u[1]);
+
+  divu = Du[0][0] + Du[1][1];
+
+  /* Step 10 and 11 */
+  for (i=0; i<lbmodel.n_dim; ++i) {
+    Dpr[i] = Dp[i]/(*rho) - *p/(*rho**rho)*Dr[i];
+    for (j=0; j<lbmodel.n_dim; ++j) {
+      for (k=0; k<lbmodel.n_dim; ++k) {
+	Dpuu[i][j][k] = Dp[i]*u[j]*u[k] + *p*Du[j][i]*u[k] + *p*u[j]*Du[k][i];
+      }
+    }
+  }
+
+  /* calculate Xi */
+  for (i=0; i<lbmodel.n_dim; ++i) {
+    for (j=0; j<lbmodel.n_dim; ++j) {
+      for (k=0; k<lbmodel.n_dim; ++k) {
+	Xi[i][j][k] = ( (gamma*gamma + 4.*gamma + 1.)/(gamma + 1.)/3.
+			* ( Dpuu[k][i][j] + Dpuu[i][j][k] + Dpuu[j][k][i]
+			    + delta(i,j) * ( *p*Dpr[k] - *pmrdp*u[k]*divu )
+			    + delta(j,k) * ( *p*Dpr[i] - *pmrdp*u[i]*divu )
+			    + delta(k,i) * ( *p*Dpr[j] - *pmrdp*u[j]*divu ) )
+			+ (1. - gamma) * *p / *rho
+			* ( delta(i,j)*jcorr[k]
+			    + delta(j,k)*jcorr[i]
+			    + delta(k,i)*jcorr[j] ) );
+      }
+    }
+  }
+
+}
+
+/***********************************************************************/
+
 void mlb_correction_collisions(double *f) {
   const double (*c)[lbmodel.n_dim] = lbmodel.c;
-  int i;
+  int i, j, k, l;
   double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
   double rho, cs2, jc;
   double w[lbmodel.n_vel];
+  double Sigma[lbmodel.n_dim][lbmodel.n_dim];
+  double Xi[lbmodel.n_dim][lbmodel.n_dim][lbmodel.n_dim];
 
+  double *force = m + 10;
   double *jcorr = m + 14;
 
   rho = m[0];
   cs2 = eq_state(rho);
   lb_weights(w, cs2);
 
-  for (i=0; i<lbmodel.n_vel; ++i) {
-    jc = c[i][0]*jcorr[0] + c[i][1]*jcorr[1];
-    f[i] += (lbpar.gamma - 1.)*w[i]/cs2*jc;
-  }
+  m[1] += 0.5*force[0] + jcorr[0];
+  m[2] += 0.5*force[1] + jcorr[1];
+
+  mlb_calc_sigma(Sigma, m);
+  mlb_calc_xi(Xi, m);
+
+   for (i=0; i<lbmodel.n_vel; ++i) {
+     jc = c[i][0]*jcorr[0] + c[i][1]*jcorr[1];
+     f[i] += (lbpar.gamma - 1.)*w[i]/cs2*jc;
+     for (j=0; j<lbmodel.n_dim; ++j) {
+       f[i] -= w[i]/(2.*cs2)*Sigma[j][j];
+       for (k=0; k<lbmodel.n_dim; ++k) {
+	 f[i] += w[i]/(2.*cs2*cs2)*Sigma[j][k]*(c[i][j]*c[i][k]);
+	 for (l=0; l<lbmodel.n_dim; ++l) {
+	   f[i] += ( w[i]/(6.*cs2*cs2*cs2) * Xi[j][k][l] * ( c[i][j]*c[i][k]*c[i][l] - cs2 * delta(j,k) * c[i][l]- cs2 * delta(k,l) * c[i][j] - cs2 * delta(l,j) * c[i][k] ) );
+	 }
+       }
+     }
+   }
 
 }
 
