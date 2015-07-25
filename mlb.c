@@ -27,7 +27,7 @@ void mlb_calc_force(double *force, double *m, int x, int y) {
   rho = m[0];
 
   for (i=0; i<lbmodel.n_fd; ++i) {
-    nb_rho = (m + lblattice.nb_offset[i]*lbmodel.n_vel)[0];
+    nb_rho = m[lblattice.nb_offset[i]*lbmodel.n_vel];
     force[0] += w[i]*c[i][0]*nb_rho;
     force[1] += w[i]*c[i][1]*nb_rho;
   }
@@ -40,7 +40,7 @@ void mlb_calc_force(double *force, double *m, int x, int y) {
 /***********************************************************************/
 
 static void mlb_calc_current(double *jc, double *m, int x, int y) {
-  double Dp[2], Dpmrdp[2], Du[2][2], D2u[2][3], divu;
+  double Dp[2], Dpmrdp[2], Du[2][2], D2u[2][2][2], divu;
 
   double *p     = m + 6;
   double *pmrdp = m + 8;
@@ -61,11 +61,11 @@ static void mlb_calc_current(double *jc, double *m, int x, int y) {
   jc[0] += Dp[0] * (Du[0][0] + Du[0][0]) + Dp[1] * (Du[0][1] + Du[1][0]);
   jc[1] += Dp[0] * (Du[1][0] + Du[0][1]) + Dp[1] * (Du[1][1] + Du[1][1]);
 
-  jc[0] += (*pmrdp + *p) * (D2u[0][0] + D2u[1][1]);
-  jc[1] += (*pmrdp + *p) * (D2u[0][1] + D2u[1][2]);
+  jc[0] += (*pmrdp + *p) * (D2u[0][0][0] + D2u[1][0][1]);
+  jc[1] += (*pmrdp + *p) * (D2u[0][1][0] + D2u[1][1][1]);
 
-  jc[0] += *p * (D2u[0][0] + D2u[0][2]);
-  jc[1] += *p * (D2u[1][0] + D2u[1][2]);
+  jc[0] += *p * (D2u[0][0][0] + D2u[0][1][1]);
+  jc[1] += *p * (D2u[1][0][0] + D2u[1][1][1]);
 
   jc[0] *= - 1./12.;
   jc[1] *= - 1./12.;

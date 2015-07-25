@@ -38,22 +38,26 @@ void secDerAA (double *res, double *m) {
 
 /***********************************************************************/
 
-void secDerAB (double *res, double *m) {
+void secDerAB (double res[][lbmodel.n_dim], double *m) {
   const double *tau = lbmodel.fd_weights[2];
   const double (*c)[lbmodel.n_dim] = lbmodel.c;
   int i, j, k;
   double field, trace;
 
-  for (j=0; j<lbmodel.n_dim*(lbmodel.n_dim+1)/2; ++j) res[j] = 0.;
+  for (j=0; j<lbmodel.n_dim; ++j) {
+    for (k=0; k<lbmodel.n_dim; ++k) {
+      res[j][k] = 0.;
+    }
+  }
 	
   for (i=0; i<lbmodel.n_fd; ++i) {
     field = m[lblattice.nb_offset[i]*lbmodel.n_vel];
     for (j=0; j<lbmodel.n_dim; ++j) {
-      for (k=0; k<=j; ++k) {
-	res[j*(j+1)/2+k] += tau[i]*c[i][j]*c[i][k]*field;
+      for (k=0; k<lbmodel.n_dim; ++k) {
+	res[j][k] += tau[i]*c[i][j]*c[i][k]*field;
       }
       for (k=0; k<lbmodel.n_dim; ++k) {
-	res[j*(j+3)/2] -= tau[i]*c[i][k]*c[i][k]/lbmodel.n_dim*field;
+	res[j][j] -= tau[i]*c[i][k]*c[i][k]/lbmodel.n_dim*field;
       }
     }
   }
@@ -63,7 +67,7 @@ void secDerAB (double *res, double *m) {
   secDerAA(&trace, m);
 
   for (j=0; j<lbmodel.n_dim; ++j) {
-    res[j*(j+3)/2] += trace/lbmodel.n_dim;
+    res[j][j] += trace/lbmodel.n_dim;
   }
 
 }

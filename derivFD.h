@@ -1,9 +1,11 @@
 #ifndef _DERIVFD_H
 #define _DERIVFD_H
 
+#include "defs.h"
+
 void firstDer (double *, double *);
 void secDerAA (double *, double *);
-void secDerAB (double *, double *);
+void secDerAB (double [][NDIM], double *);
 void thirdDer (double *, double *);
 
 /***********************************************************************/
