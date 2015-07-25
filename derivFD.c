@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include "derivFD.h"
 #include "d2q21.h"
-//#include "defs.h"
 
 void firstDer (double *res, double *m) {
   const double *tau = lbmodel.fd_weights[0];

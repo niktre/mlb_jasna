@@ -7,6 +7,9 @@
  *
  ***********************************************************************/
 
+#ifndef EOS_H
+#define EOS_H
+
 #include <stdlib.h>
 
 /* phase separation densities */
@@ -118,3 +121,5 @@ static double der2P(double rho) {
 }
 
 /***********************************************************************/
+
+#endif

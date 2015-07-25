@@ -132,14 +132,6 @@ LB_Parameters lbpar;
 void lb_halo_copy();
 
 /***********************************************************************/
-#define R0 1.0
-#define R1 0.5
-#define R2 1.0
-#define R3 1.5
-#define S1 0.6
-#define A  1.2
-
-double eq_state(double);
 
 #endif
 
