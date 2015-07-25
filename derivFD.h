@@ -1,7 +1,7 @@
 #ifndef _DERIVFD_H
 #define _DERIVFD_H
 
-#include "defs.h"
+#include "d2q21.h"
 
 void firstDer (double *, double *);
 void secDerAA (double *, double *);

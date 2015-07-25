@@ -9,8 +9,8 @@
 
 #include <math.h>
 #include <stdio.h>
-#include "defs.h"
 #include "derivFD.h"
+#include "eos.h"
 
 #define TOLERANCE 1.e-3
 
@@ -230,11 +230,9 @@ void mlb_correction_current(double *m0) {
 
     //fprintf(stderr, "Iteration #%d: dmax = %f\n", niter, dmax);
 
-  } while (dmax > TOLERANCE);
+  } while(0);// (dmax > TOLERANCE);
 
   fprintf(stderr, "Implicit algorithm converged after %d iteration(s).\n", niter);
-
-}
 
 /***********************************************************************/
 
@@ -253,6 +251,13 @@ void mlb_interface_collisions(double *f) {
     f[i] += 0.5*(1. + lbpar.gamma)*w[i]/cs2*fc;
   }
 
+}
+
+/***********************************************************************/
+
+inline static double delta(int a, int b){
+	if (a == b) return 1.0;
+	else return 0.0;
 }
 
 /***********************************************************************/

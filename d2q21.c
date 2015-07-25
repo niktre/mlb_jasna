@@ -25,10 +25,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "derivFD.h"
 #include "d2q21.h"
 #include "mlb.h"
-#include "derivFD.h"
-#include "defs.h"
+#include "eos.h"
 
 /***********************************************************************/
 
@@ -404,8 +404,8 @@ static void lb_init_fluid() {
   double *f = lbf;
   double rho1, rho2;
 
-  rho1 = 1.4;
-  rho2 = 1.2;
+  rho1 = RHO_HIGH;
+  rho2 = RHO_LOW;
 
   for (x=0; x<lblattice.halo_grid[0]; ++x) {
     for (y=0; y<lblattice.halo_grid[1]; ++y, f+=lbmodel.n_vel) {
