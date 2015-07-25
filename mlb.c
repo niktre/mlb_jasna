@@ -268,7 +268,6 @@ inline static void mlb_calc_sigma(double Sigma[][lbmodel.n_dim], double *m) {
     Dpmrdpdivu[lbmodel.n_dim],
     Drdpudu[lbmodel.n_dim][lbmodel.n_dim],
     Du[lbmodel.n_dim][lbmodel.n_dim],
-    Dj[lbmodel.n_dim][lbmodel.n_dim],
     D2p[lbmodel.n_dim][lbmodel.n_dim],
     D2u[lbmodel.n_dim][lbmodel.n_dim][lbmodel.n_dim],
     divu, divj;
@@ -285,17 +284,15 @@ inline static void mlb_calc_sigma(double Sigma[][lbmodel.n_dim], double *m) {
   firstDer(Dpmrdp, pmrdp);
   firstDer(Du[0], &u[0]);
   firstDer(Du[1], &u[1]);
-  firstDer(Dj[0], &m[1]);
-  firstDer(Dj[1], &m[2]);
   secDerAB(D2p, p);
   secDerAB(D2u[0], &u[0]);
   secDerAB(D2u[1], &u[1]);
 
-  divu = Du[0][0] + Du[1][1];
-  divj = Dj[0][0] + Dj[1][1];
-
   /* Step 10 and 11 */
+  divu = divj = 0.;
   for (i=0; i<lbmodel.n_dim; ++i) {
+    divu += Du[i][i];
+    divj += Dr[i]*u[i] + *rho*Du[i][i];
     Dpdu[i] = ( Dp[0] * ( Du[0][i] + Du[i][1] )
 		+ Dp[1] * ( Du[1][i] + Du[i][1] )
 		+ *p * ( D2u[0][0][i] + D2u[1][1][i]
@@ -350,10 +347,10 @@ inline static void mlb_calc_xi(double Xi[][lbmodel.n_dim][lbmodel.n_dim],
   firstDer(Du[0], &u[0]);
   firstDer(Du[1], &u[1]);
 
-  divu = Du[0][0] + Du[1][1];
-
   /* Step 10 and 11 */
+  divu = 0.;
   for (i=0; i<lbmodel.n_dim; ++i) {
+    divu += Du[i][i];
     Dpr[i] = Dp[i]/(*rho) - *p/(*rho**rho)*Dr[i];
     for (j=0; j<lbmodel.n_dim; ++j) {
       for (k=0; k<lbmodel.n_dim; ++k) {
@@ -392,15 +389,11 @@ void mlb_correction_collisions(double *f) {
   double Sigma[lbmodel.n_dim][lbmodel.n_dim];
   double Xi[lbmodel.n_dim][lbmodel.n_dim][lbmodel.n_dim];
 
-  double *force = m + 10;
   double *jcorr = m + 14;
 
   rho = m[0];
   cs2 = eq_state(rho);
   lb_weights(w, cs2);
-
-  m[1] += 0.5*force[0] + jcorr[0];
-  m[2] += 0.5*force[1] + jcorr[1];
 
   mlb_calc_sigma(Sigma, m);
   mlb_calc_xi(Xi, m);
