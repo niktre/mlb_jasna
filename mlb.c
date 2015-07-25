@@ -259,7 +259,7 @@ void mlb_interface_collisions(double *f) {
 
 inline static void mlb_calc_sigma(double Sigma[][lbmodel.n_dim], double *m) {
   const double gamma = lbpar.gamma;
-  int i, j, k;
+  int i, j;
 
   double Dr[lbmodel.n_dim],
     Dp[lbmodel.n_dim],
@@ -296,7 +296,8 @@ inline static void mlb_calc_sigma(double Sigma[][lbmodel.n_dim], double *m) {
 
   /* Step 10 and 11 */
   for (i=0; i<lbmodel.n_dim; ++i) {
-    Dpdu[i] = ( Dp[0] * ( Du[0][1] + Du[1][0] )
+    Dpdu[i] = ( Dp[0] * ( Du[0][i] + Du[i][1] )
+		+ Dp[1] * ( Du[1][i] + Du[i][1] )
 		+ *p * ( D2u[0][0][i] + D2u[1][1][i]
 			 + D2u[i][0][0] + D2u[i][1][1] ) );
     Dpmrdpdivu[i] = Dpmrdp[i]*divu - *pmrdp*(D2u[0][i][0] + D2u[1][i][1]);
@@ -304,8 +305,6 @@ inline static void mlb_calc_sigma(double Sigma[][lbmodel.n_dim], double *m) {
       Drdpudu[i][j] = ( D2p[i][j]/(*rho) - Dr[i]*Dp[j]/(*rho**rho)
 		       + Du[0][i]*Du[j][0] + Du[1][i]*Du[j][1]
 		       + u[0]*D2u[j][i][0] + u[1]*D2u[j][i][1] );
-      for (k=0; k<lbmodel.n_dim; ++k) {
-      }
     }
   }
 
@@ -315,13 +314,13 @@ inline static void mlb_calc_sigma(double Sigma[][lbmodel.n_dim], double *m) {
       Sigma[i][j] = ( -0.25*(gamma+1.)*(gamma+1.)/(gamma-1.)
 		      * ( u[i]*Dpmrdpdivu[j] + u[j]*Dpmrdpdivu[i]
 			  + u[i]*Dpdu[j] + u[j]*Dpdu[i] )
-		      + (gamma*gamma + 4.*gamma + 1.)/(gamma-1.)/6.
+		      - (gamma*gamma + 4.*gamma + 1.)/(gamma-1.)/6.
 		      * ( *dp * divj * ( Du[i][j] + Du[j][i] )
-			  - *p * ( Drdpudu[i][j] + Drdpudu[j][i] ) ) );
+			  + *p * ( Drdpudu[i][j] + Drdpudu[j][i] ) ) );
     }
-    Sigma[i][i] += ( (gamma*gamma + 4.*gamma + 1.)/(gamma-1.)/6.
-		     * ( - *pmrdp * ( Drdpudu[0][0] + Drdpudu[1][1] )
-			 + *rd2p * divu * divj ) );
+    Sigma[i][i] -= ( (gamma*gamma + 4.*gamma + 1.)/(gamma-1.)/6.
+		     * ( *pmrdp * ( Drdpudu[0][0] + Drdpudu[1][1] )
+			 - *rd2p * divu * divj ) );
   }
 
 }
@@ -369,9 +368,9 @@ inline static void mlb_calc_xi(double Xi[][lbmodel.n_dim][lbmodel.n_dim],
       for (k=0; k<lbmodel.n_dim; ++k) {
 	Xi[i][j][k] = ( (gamma*gamma + 4.*gamma + 1.)/(gamma + 1.)/3.
 			* ( Dpuu[k][i][j] + Dpuu[i][j][k] + Dpuu[j][k][i]
-			    + delta(i,j) * ( *p*Dpr[k] - *pmrdp*u[k]*divu )
-			    + delta(j,k) * ( *p*Dpr[i] - *pmrdp*u[i]*divu )
-			    + delta(k,i) * ( *p*Dpr[j] - *pmrdp*u[j]*divu ) )
+			    + delta(i,j) * ( *p*Dpr[k] + *pmrdp*u[k]*divu )
+			    + delta(j,k) * ( *p*Dpr[i] + *pmrdp*u[i]*divu )
+			    + delta(k,i) * ( *p*Dpr[j] + *pmrdp*u[j]*divu ) )
 			+ (1. - gamma) * *p / *rho
 			* ( delta(i,j)*jcorr[k]
 			    + delta(j,k)*jcorr[i]
@@ -388,7 +387,7 @@ void mlb_correction_collisions(double *f) {
   const double (*c)[lbmodel.n_dim] = lbmodel.c;
   int i, j, k, l;
   double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
-  double rho, cs2, jc;
+  double rho, cs2, jc, sc, xc;
   double w[lbmodel.n_vel];
   double Sigma[lbmodel.n_dim][lbmodel.n_dim];
   double Xi[lbmodel.n_dim][lbmodel.n_dim][lbmodel.n_dim];
@@ -407,17 +406,19 @@ void mlb_correction_collisions(double *f) {
   mlb_calc_xi(Xi, m);
 
    for (i=0; i<lbmodel.n_vel; ++i) {
-     jc = c[i][0]*jcorr[0] + c[i][1]*jcorr[1];
-     f[i] += (lbpar.gamma - 1.)*w[i]/cs2*jc;
+     jc = sc = xc = 0.;
      for (j=0; j<lbmodel.n_dim; ++j) {
-       f[i] -= w[i]/(2.*cs2)*Sigma[j][j];
+       jc += jcorr[j]*c[i][j];
        for (k=0; k<lbmodel.n_dim; ++k) {
-	 f[i] += w[i]/(2.*cs2*cs2)*Sigma[j][k]*(c[i][j]*c[i][k]);
+	 sc += Sigma[j][k]*(c[i][j]*c[i][k] - cs2 * delta(j,k));
 	 for (l=0; l<lbmodel.n_dim; ++l) {
-	   f[i] += ( w[i]/(6.*cs2*cs2*cs2) * Xi[j][k][l] * ( c[i][j]*c[i][k]*c[i][l] - cs2 * delta(j,k) * c[i][l]- cs2 * delta(k,l) * c[i][j] - cs2 * delta(l,j) * c[i][k] ) );
+	   xc += Xi[j][k][k] * ( c[i][j]*c[i][k]*c[i][l] - cs2 * delta(j,k) * c[i][l]- cs2 * delta(k,l) * c[i][j] - cs2 * delta(l,j) * c[i][k] );
 	 }
        }
      }
+     f[i] += (lbpar.gamma - 1.)*w[i]/cs2*jc;
+     f[i] += w[i]/(2.*cs2*cs2)*sc;
+     f[i] += w[i]/(6.*cs2*cs2*cs2)*xc;
    }
 
 }
