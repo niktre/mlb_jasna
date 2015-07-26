@@ -57,7 +57,7 @@ static double eq_state(double rho) {
 }
 
 /***********************************************************************/
-
+/*
 static double derS(double rho) {
   double ds;
 
@@ -73,9 +73,9 @@ static double derS(double rho) {
   return ds;
   
 }
-
+*/
 /***********************************************************************/
-
+/*
 static double der2S(double rho) {
   double d2s;
   
@@ -91,7 +91,7 @@ static double der2S(double rho) {
   return d2s;
 
 }
-
+*/
 /***********************************************************************/
 
 static double derP(double rho) {
@@ -100,7 +100,8 @@ static double derP(double rho) {
   if (rho <= R1 || rho >= R3) {
     dp = S1;
   } else {
-    dp = eq_state(rho) + rho*derS(rho);
+    /* dp = eq_state(rho) + rho*derS(rho); */
+    dp = eq_state(rho)*(1. + rho*psi(rho));
   }
 
   return dp;
@@ -115,7 +116,8 @@ static double der2P(double rho) {
   if (rho <= R1 || rho >= R3) {
     d2p = 0.0;
   } else {
-    d2p = 2.0*derS(rho) + rho*der2S(rho);
+    /* d2p = 2.0*derS(rho) + rho*der2S(rho); */
+    d2p = eq_state(rho)*(psi(rho)*(2. + rho*psi(rho)) + rho*dpsi(rho));
   }
 
   return d2p;
