@@ -124,4 +124,27 @@ static double der2P(double rho) {
 
 /***********************************************************************/
 
+inline static void write_eos() {
+  FILE* file;
+  double rho, cs2, p, dp, d2p;
+
+  file = fopen("eos.dat", "w");
+
+  for (rho=0.4; rho<=1.6; rho+=0.01) {
+
+    cs2 = eq_state(rho);
+    p = rho*cs2;
+    dp = derP(rho);
+    d2p = der2P(rho);
+
+    fprintf(file, "%f %f %f %f %f\n", rho, cs2, p, dp, d2p);
+
+  }
+
+  fclose(file);
+
+}
+
+/***********************************************************************/
+
 #endif

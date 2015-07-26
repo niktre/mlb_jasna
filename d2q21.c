@@ -554,6 +554,8 @@ int main(int argc, char *argv[]) {
   gamma = 0.0;
   kappa = atof(argv[1]);
 
+  write_eos();
+
   lb_init(grid,rho,gamma,kappa);
 
   fprintf(stdout, "Running  %d iterations\n", n_steps); fflush(stdout);
