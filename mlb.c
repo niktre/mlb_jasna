@@ -53,12 +53,22 @@ static void mlb_calc_current(double *jc, LB_Moments *m, int x, int y) {
   double *pmrdp = &(m->pmrdp); // m + 8
   double *u     = m->u;        // m + 12
 
+  for (i=0; i<lbmodel.n_dim; ++i) {
+    Dp[i] = 0.;
+    Dpmrdp[i] = 0.;
+    Du[0][i] = Du[1][i] = 09.;
+    for (j=0; j<lbmodel.n_dim; ++j) {
+      D2u[0][i][j] = 0.;
+      D2u[1][i][j] = 0.;
+    }
+  }
+
   firstDer(Dp, p);
   firstDer(Dpmrdp, pmrdp);
-  firstDer(Du[0], &u[0]);
-  firstDer(Du[1], &u[1]);
-  secDerAB(D2u[0], &u[0]);
-  secDerAB(D2u[1], &u[1]);
+  for (i=0; i<lbmodel.n_dim; ++i) {
+    firstDer(Du[i], &u[i]);
+    secDerAB(D2u[i], &u[i]);
+  }
 
   divu = 0.0;
   for (i=0; i<lbmodel.n_dim; ++i) {
@@ -104,6 +114,8 @@ static void mlb_calc_current(double *jc, LB_Moments *m, int x, int y) {
 
 static void ic_read(double *dmax, LB_Moments *m, int x, int y) {
   double jnew[lbmodel.n_dim], *jc = m->jcorr, d;
+
+  jnew[0] = jnew[1] = 0.0;
 
   mlb_calc_current(jnew, m, x, y);
 
@@ -258,7 +270,7 @@ void mlb_correction_current(double *m0) {
 
     //fprintf(stderr, "Iteration #%d: dmax = %f\n", niter, dmax);
 
-  } while(0);// (dmax > TOLERANCE);
+  } while (dmax > TOLERANCE);
 
   fprintf(stderr, "Implicit algorithm converged after %d iteration(s).\n", niter);
 

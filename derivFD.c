@@ -22,7 +22,7 @@ void firstDer (double *res, double *m) {
 
 /***********************************************************************/
 
-void secDerAA (double *res, double *m) {
+void secDerAA (double res[], double *m) {
   const double *tau = lbmodel.fd_weights[1];
   int i;
   double field;
@@ -72,7 +72,7 @@ void secDerAB (double res[][lbmodel.n_dim], double *m) {
 
 /***********************************************************************/
 
-void thirdDer (double *res, double *m) {
+void thirdDer (double res[], double *m) {
   const double *tau = lbmodel.fd_weights[3];
   const double (*c)[lbmodel.n_dim] = lbmodel.c;
   int i, j;
