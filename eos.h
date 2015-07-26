@@ -26,32 +26,34 @@
 
 /***********************************************************************/
 
-static double eq_state(double rho) {
-  double cs2, integral;
-  
-  if (rho <= R1 || rho >= R3) {
-    integral = 0.0;
-  } else if (rho < R3) {
-    integral = A*(R2-R1)/M_PI*(1.0 - cos(M_PI*(rho-R1)/(R2-R1)));
-  } else {
-    printf ("I've lost myself in the EOS!\n");
-    exit (0);
-  }
+static double psi(double rho) {
+  return A*sin(M_PI*(rho-R1)/(R2-R1));
+}
 
-  cs2 = S1 * exp(integral);
-  
-  return cs2;
-    
+static double dpsi(double rho) {
+  return A*M_PI/(R2-R1)*cos(M_PI*(rho-R1)/(R2-R1));
+}
+
+static double intpsi(double rho) {
+  return A*(Rs-R1)/M_PI*(1.0 - cos(M_PI*(rho-R1)/(R2-R1)));
 }
 
 /***********************************************************************/
 
-static double psi(double rho) {
-  return A*sin(M_PI*(rho-R1)/(R2-R1)); 
-}
+static double eq_state(double rho) {
+  double cs2, integral;
+  
+  if (rho <= R1 || rho >= R3) {
+    cs2 = S1;
+  } else if (rho < R3) {
+    cs2 = S1 * exp(intpsi(rho));
+  } else {
+    printf ("I've lost myself in the EOS (rho=%f)!\n", rho);
+    exit (0);
+  }
 
-static double dpsi(double  rho) {
-  return A*M_PI/(R2-R1)*cos(M_PI*(rho-R1)/(R2-R1));
+  return cs2;
+    
 }
 
 /***********************************************************************/
