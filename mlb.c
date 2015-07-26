@@ -16,7 +16,7 @@
 
 /***********************************************************************/
 
-void mlb_calc_force(double *force, double *m, int x, int y) {
+void mlb_calc_force(double *force, LB_Moments *m, int x, int y) {
   const double *w = lbmodel.fd_weights[3];
   const double (*c)[lbmodel.n_dim] = lbmodel.c;
   int i;
@@ -24,13 +24,15 @@ void mlb_calc_force(double *force, double *m, int x, int y) {
 
   force[0] = force[1] = 0.0;
 
-  rho = m[0];
+  rho = m->rho;
 
   for (i=0; i<lbmodel.n_fd; ++i) {
-    nb_rho = m[lblattice.nb_offset[i]*lbmodel.n_vel];
+    nb_rho = ((double *)m)[lblattice.nb_offset[i]*lbmodel.n_vel];
     force[0] += w[i]*c[i][0]*nb_rho;
     force[1] += w[i]*c[i][1]*nb_rho;
   }
+
+  //thirdDer(force, &(m->rho));
 
   force[0] *= lbpar.kappa*rho;
   force[1] *= lbpar.kappa*rho;
@@ -73,6 +75,11 @@ static void mlb_calc_current(double *jc, LB_Moments *m, int x, int y) {
     jc[i] /= -12.;
   }
 
+  double norm = jc[0]*jc[0]+jc[1]*jc[1];
+  if (norm > 1.) {
+    fprintf(stderr, "Warning! Large correction current jc = (%f,%f)\n", jc[0],jc[1]);
+  }
+
   //jc[0] = Dpmrdp[0] * divu;
   //jc[1] = Dpmrdp[1] * divu;
   //
@@ -95,52 +102,6 @@ static void mlb_calc_current(double *jc, LB_Moments *m, int x, int y) {
 
 /***********************************************************************/
 
-static void mlb_init_current(double *m) {
-  int x, y, xl, xh, yl, yh, xoff;
-  double rho, p, dp, d2p, force[lbmodel.n_dim];
-
-  xl = lblattice.halo_size[0];
-  xh = lblattice.halo_size[0] + lblattice.grid[0];
-  yl = lblattice.halo_size[1];
-  yh = lblattice.halo_size[1] + lblattice.grid[1];
-
-  xoff = lblattice.halo_grid[0] - (xh - xl);
-
-  m += lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
-
-  for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
-    for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
-
-      rho = m[0];
-      p   = rho*eq_state(rho);
-      dp  = derP(rho);
-      d2p = der2P(rho);
-
-      /* Step 1 */
-      m[6] = p;
-      m[7] = dp;
-      m[8] = p - rho*dp;
-      m[9] = rho*d2p;
-
-      /* Step 2 */
-      mlb_calc_force(force, m, x, y);
-      m[10] = force[0];
-      m[11] = force[1];
-
-      /* Step 3 */
-      m[12] = (m[1] + 0.5*force[0])/m[0];
-      m[13] = (m[2] + 0.5*force[1])/m[0];
-
-      //m[14] = 0.0; /* correction current */
-      //m[15] = 0.0;
-
-    }
-  }
-
-}
-
-/***********************************************************************/
-
 static void ic_read(double *dmax, LB_Moments *m, int x, int y) {
   double jnew[lbmodel.n_dim], *jc = m->jcorr, d;
 
@@ -153,6 +114,11 @@ static void ic_read(double *dmax, LB_Moments *m, int x, int y) {
 
   jc[0] = jnew[0];
   jc[1] = jnew[1];
+
+  double norm = jc[0]*jc[0]+jc[1]*jc[1];
+  if (norm > 1e3) {
+    fprintf(stderr, "Warning! Large correction current jc = (%f,%f)\n", jc[0],jc[1]);
+  }
 
 }
 
@@ -195,6 +161,54 @@ static void ic_write_column(double *m, int x) {
 
   for (y=yl, m+=yl*lbmodel.n_vel; y<=yh; ++y, m+=lbmodel.n_vel) {
     ic_write((LB_Moments *)m, x, y);
+  }
+
+}
+
+/***********************************************************************/
+
+static void mlb_init_current(double *m) {
+  int x, y, xl, xh, yl, yh, xoff;
+  double rho, p, dp, d2p, force[lbmodel.n_dim];
+
+  xl = lblattice.halo_size[0];
+  xh = lblattice.halo_size[0] + lblattice.grid[0];
+  yl = lblattice.halo_size[1];
+  yh = lblattice.halo_size[1] + lblattice.grid[1];
+
+  xoff = lblattice.halo_grid[0] - (xh - xl);
+
+  m += lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
+
+  for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
+    for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
+
+      LB_Moments *lbmom = (LB_Moments *)m;
+
+      rho = lbmom->rho;
+      p   = rho*eq_state(rho);
+      dp  = derP(rho);
+      d2p = der2P(rho);
+
+      /* Step 1 */
+      lbmom->p     = p;
+      lbmom->dp    = dp;
+      lbmom->pmrdp = p - rho*dp;
+      lbmom->rd2p  = rho*d2p;
+
+      /* Step 2 */
+      mlb_calc_force(force, lbmom, x, y);
+      lbmom->force[0] = force[0];
+      lbmom->force[1] = force[1];
+
+      /* Step 3 */
+      lbmom->u[0] = (lbmom->j[0] + 0.5*force[0])/rho;
+      lbmom->u[1] = (lbmom->j[1] + 0.5*force[1])/rho;
+
+      //lbmom->jcorr[0] = 0.0; /* correction current */
+      //lbmom->jcorr[1] = 0.0;
+
+    }
   }
 
 }

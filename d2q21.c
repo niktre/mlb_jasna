@@ -145,8 +145,8 @@ static void lb_calc_moments(double *f) {
   lbmom->u[1] = m[2]/m[0];
 
   /* correction current */
-  lbmom->jcorr[0] = 0.0;
-  lbmom->jcorr[1] = 0.0;
+  //lbmom->jcorr[0] = 0.0;
+  //lbmom->jcorr[1] = 0.0;
 
 }
 
@@ -156,14 +156,13 @@ static void lb_calc_equilibrium(double *f_eq, double *f) {
 
   int i;
   double w[lbmodel.n_vel];
-  double rho, u[lbmodel.n_dim], uc, u2, cs2;
-  double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
+  double rho, *u, uc, u2, cs2;
+  LB_Moments *m = (LB_Moments *)(f + lblattice.halo_grid_volume*lbmodel.n_vel);
 
-  rho  = m[0];
+  rho  = m->rho;
   //u[0] = (m[1] + 0.5*force[0])/rho;
   //u[1] = (m[2] + 0.5*force[1])/rho;
-  u[0] = m[12];
-  u[1] = m[13];
+  u    = m->u; // m + 12
 
   cs2 = eq_state(rho);
   lb_weights(w, cs2);
@@ -388,8 +387,7 @@ static void lb_collide_stream(double *f) {
 
 /***********************************************************************/
 
-static void lb_update() {
-  double *f = lbf;
+static void lb_update(double *f) {
   double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
 
   mlb_correction_current(m);
@@ -593,7 +591,7 @@ int main(int argc, char *argv[]) {
 
   start = (double) clock();
   for (i=0; i<n_steps; ++i) {
-    lb_update();
+    lb_update(lbf);
     lb_mass_mom(i+1);
   }
   finish = (double) clock();

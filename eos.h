@@ -19,7 +19,7 @@
 
 /* constants that define equation of state: p/rho */
 #define A  1.2
-#define S1 0.6
+#define S1 0.5
 #define R1 0.5
 #define R2 1.0
 #define R3 (2.0*R2-R1)

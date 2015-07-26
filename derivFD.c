@@ -55,14 +55,12 @@ void secDerAB (double res[][lbmodel.n_dim], double *m) {
     for (j=0; j<lbmodel.n_dim; ++j) {
       for (k=0; k<lbmodel.n_dim; ++k) {
 	res[j][k] += tau[i]*c[i][j]*c[i][k]*field;
-      }
-      for (k=0; k<lbmodel.n_dim; ++k) {
-	res[j][j] -= tau[i]*c[i][k]*c[i][k]/lbmodel.n_dim*field;
+	res[j][j] -= tau[i]*c[i][k]*c[i][k]*field/lbmodel.n_dim;
       }
     }
   }
 
-  //fprintf(stderr, "trace=%f\n", res[0]+res[2]);
+  //fprintf(stderr, "trace=%f\n", res[0][0]+res[1][1]);
 
   secDerAA(&trace, m);
 
