@@ -128,23 +128,25 @@ static void lb_calc_moments(double *f) {
   dp  = derP(rho);
   d2p = der2P(rho);
 
+  LB_Moments *lbmom = (LB_Moments *)m;
+
   /* pressure and derivatives */
-  m[6] = p;
-  m[7] = dp;
-  m[8] = p - rho*dp;
-  m[9] = rho*d2p;
+  lbmom->p     = p;
+  lbmom->dp    = dp;
+  lbmom->pmrdp = p - rho*dp;
+  lbmom->rd2p  = rho*d2p;
 
   /* force */
-  m[10] = 0.0;
-  m[11] = 0.0;
+  lbmom->force[0] = 0.0;
+  lbmom->force[1] = 0.0;
 
   /* velocity */
-  m[12] = m[1]/m[0];
-  m[13] = m[2]/m[0];
+  lbmom->u[0] = m[1]/m[0];
+  lbmom->u[1] = m[2]/m[0];
 
   /* correction current */
-  m[14] = 0.0;
-  m[15] = 0.0;
+  lbmom->jcorr[0] = 0.0;
+  lbmom->jcorr[1] = 0.0;
 
 }
 
@@ -198,7 +200,7 @@ static void lb_collisions(double *f, int x, int y) {
 
   mlb_interface_collisions(f);
 
-  //mlb_correction_collisions(f);
+  mlb_correction_collisions(f);
 
 }
 
@@ -494,7 +496,7 @@ void lb_finalize() {
 
 /***********************************************************************/
 
-void lb_dens_mom() {
+void lb_mass_mom(int i) {
   int x, y, xl, xh, yl, yh, xoff;
   double rho, j[lbmodel.n_dim];
   double *m = lbf + lblattice.halo_grid_volume*lbmodel.n_vel;
@@ -517,7 +519,7 @@ void lb_dens_mom() {
     }
   }
 
-  fprintf(stderr, "rho = %f j = (%f,%f)\n", rho, j[0], j[1]);
+  fprintf(stderr, "#%d: rho = %f j = (%f,%f)\n", i, rho, j[0], j[1]);
 
 }
 
@@ -585,14 +587,14 @@ int main(int argc, char *argv[]) {
 
   write_eos();
 
-  lb_init(grid,rho,gamma,kappa);
+  lb_init(grid,rho,gamma,kappa); lb_mass_mom(0);
 
   fprintf(stdout, "Running  %d iterations\n", n_steps); fflush(stdout);
 
   start = (double) clock();
   for (i=0; i<n_steps; ++i) {
     lb_update();
-    lb_dens_mom();
+    lb_mass_mom(i+1);
   }
   finish = (double) clock();
 

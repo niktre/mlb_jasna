@@ -13,8 +13,8 @@
 #include <stdlib.h>
 
 /* phase separation densities */
-#define RHO_LOW 1.13 //0.577348
-#define RHO_HIGH 1.47 //1.325965
+#define RHO_LOW  1.2 //1.13 //0.577348
+#define RHO_HIGH 1.4 //1.47 //1.325965
 #define RHO_MEAN ((RHO_LOW+RHO_HIGH)/2.0)
 
 /* constants that define equation of state: p/rho */

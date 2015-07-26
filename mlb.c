@@ -39,16 +39,17 @@ void mlb_calc_force(double *force, double *m, int x, int y) {
 
 /***********************************************************************/
 
-static void mlb_calc_current(double *jc, double *m, int x, int y) {
+static void mlb_calc_current(double *jc, LB_Moments *m, int x, int y) {
+  int i, j;
   double Dp[lbmodel.n_dim],
     Dpmrdp[lbmodel.n_dim],
     Du[lbmodel.n_dim][lbmodel.n_dim],
     D2u[lbmodel.n_dim][lbmodel.n_dim][lbmodel.n_dim],
     divu;
 
-  double *p     = m + 6;
-  double *pmrdp = m + 8;
-  double *u     = m + 12;
+  double *p     = &(m->p);     // m + 6
+  double *pmrdp = &(m->pmrdp); // m + 8
+  double *u     = m->u;        // m + 12
 
   firstDer(Dp, p);
   firstDer(Dpmrdp, pmrdp);
@@ -57,22 +58,35 @@ static void mlb_calc_current(double *jc, double *m, int x, int y) {
   secDerAB(D2u[0], &u[0]);
   secDerAB(D2u[1], &u[1]);
 
-  divu = Du[0][0] + Du[1][1];
+  divu = 0.0;
+  for (i=0; i<lbmodel.n_dim; ++i) {
+    divu += Du[i][i];
+  }
 
-  jc[0] = Dpmrdp[0] * divu;
-  jc[1] = Dpmrdp[1] * divu;
+  for (i=0; i<lbmodel.n_dim; ++i) {
+    jc[i] = Dpmrdp[i] * divu;
+    for (j=0; j<lbmodel.n_dim; ++j) {
+      jc[i] += Dp[j] * (Du[i][j] + Du[j][i]);
+      jc[i] += (*pmrdp + *p) * D2u[j][i][j];
+      jc[i] += *p * D2u[i][j][j];
+    }
+    jc[i] /= -12.;
+  }
 
-  jc[0] += Dp[0] * (Du[0][0] + Du[0][0]) + Dp[1] * (Du[0][1] + Du[1][0]);
-  jc[1] += Dp[0] * (Du[1][0] + Du[0][1]) + Dp[1] * (Du[1][1] + Du[1][1]);
-
-  jc[0] += (*pmrdp + *p) * (D2u[0][0][0] + D2u[1][0][1]);
-  jc[1] += (*pmrdp + *p) * (D2u[0][1][0] + D2u[1][1][1]);
-
-  jc[0] += *p * (D2u[0][0][0] + D2u[0][1][1]);
-  jc[1] += *p * (D2u[1][0][0] + D2u[1][1][1]);
-
-  jc[0] *= - 1./12.;
-  jc[1] *= - 1./12.;
+  //jc[0] = Dpmrdp[0] * divu;
+  //jc[1] = Dpmrdp[1] * divu;
+  //
+  //jc[0] += Dp[0] * (Du[0][0] + Du[0][0]) + Dp[1] * (Du[0][1] + Du[1][0]);
+  //jc[1] += Dp[0] * (Du[1][0] + Du[0][1]) + Dp[1] * (Du[1][1] + Du[1][1]);
+  //
+  //jc[0] += (*pmrdp + *p) * (D2u[0][0][0] + D2u[1][0][1]);
+  //jc[1] += (*pmrdp + *p) * (D2u[0][1][0] + D2u[1][1][1]);
+  //
+  //jc[0] += *p * (D2u[0][0][0] + D2u[0][1][1]);
+  //jc[1] += *p * (D2u[1][0][0] + D2u[1][1][1]);
+  //
+  //jc[0] *= - 1./12.;
+  //jc[1] *= - 1./12.;
 
   //jc[0] = 0.0;
   //jc[1] = 0.0;
@@ -127,8 +141,8 @@ static void mlb_init_current(double *m) {
 
 /***********************************************************************/
 
-static void ic_read(double *dmax, double *m, int x, int y) {
-  double jnew[lbmodel.n_dim], *jc = m + 14, d;
+static void ic_read(double *dmax, LB_Moments *m, int x, int y) {
+  double jnew[lbmodel.n_dim], *jc = m->jcorr, d;
 
   mlb_calc_current(jnew, m, x, y);
 
@@ -144,13 +158,13 @@ static void ic_read(double *dmax, double *m, int x, int y) {
 
 /***********************************************************************/
 
-static void ic_write(double *m, int x, int y) {
+static void ic_write(LB_Moments *m, int x, int y) {
 
-  double rho = m[0];
-  double *j  = m + 1;
-  double *g  = m + 10;
-  double *u  = m + 12;
-  double *jc = m + 14;
+  double rho = m->rho;
+  double *j  = m->j;
+  double *g  = m->force;
+  double *u  = m->u;
+  double *jc = m->jcorr;
 
   u[0] = (j[0] + 0.5*g[0] + jc[0])/rho;
   u[1] = (j[1] + 0.5*g[1] + jc[1])/rho;
@@ -166,7 +180,7 @@ static void ic_read_column(double *dmax, double *m, int x) {
   yh = lblattice.halo_size[1] + lblattice.grid[1] - 1;
 
   for (y=yl, m+=yl*lbmodel.n_vel; y<=yh; ++y, m+=lbmodel.n_vel) {
-    ic_read(dmax, m, x, y);
+    ic_read(dmax, (LB_Moments *)m, x, y);
   }
 
 }
@@ -180,7 +194,7 @@ static void ic_write_column(double *m, int x) {
   yh = lblattice.halo_size[1] + lblattice.grid[1] - 1;
 
   for (y=yl, m+=yl*lbmodel.n_vel; y<=yh; ++y, m+=lbmodel.n_vel) {
-    ic_write(m, x, y);
+    ic_write((LB_Moments *)m, x, y);
   }
 
 }
@@ -240,8 +254,8 @@ void mlb_correction_current(double *m0) {
 
 void mlb_interface_collisions(double *f) {
   int i;
-  double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
-  double rho, cs2, fc, *force = m + 10;
+  LB_Moments *m = (LB_Moments *)(f + lblattice.halo_grid_volume*lbmodel.n_vel);
+  double rho, cs2, fc, *force = m->force;
   double w[lbmodel.n_vel];
 
   rho = RHO_MEAN;
@@ -264,7 +278,7 @@ inline static double delta(int a, int b){
 
 /***********************************************************************/
 
-inline static void mlb_calc_sigma(double Sigma[][lbmodel.n_dim], double *m) {
+inline static void mlb_calc_sigma(double Sigma[][lbmodel.n_dim], LB_Moments *m) {
   const double gamma = lbpar.gamma;
   int i, j;
 
@@ -279,12 +293,12 @@ inline static void mlb_calc_sigma(double Sigma[][lbmodel.n_dim], double *m) {
     D2u[lbmodel.n_dim][lbmodel.n_dim][lbmodel.n_dim],
     divu, divj;
 
-  double *rho   = m;
-  double *p     = m + 6;
-  double *dp    = m + 7;
-  double *pmrdp = m + 8;
-  double *rd2p  = m + 9;
-  double *u     = m + 12;
+  double *rho   = &(m->rho);   // m
+  double *p     = &(m->p);     // m + 6
+  double *dp    = &(m->dp);    // m + 7
+  double *pmrdp = &(m->pmrdp); // m + 8
+  double *rd2p  = &(m->rd2p);  // m + 9
+  double *u     = m->u;        // m + 12;
 
   firstDer(Dr, rho);
   firstDer(Dp, p);
@@ -332,7 +346,7 @@ inline static void mlb_calc_sigma(double Sigma[][lbmodel.n_dim], double *m) {
 /***********************************************************************/
 
 inline static void mlb_calc_xi(double Xi[][lbmodel.n_dim][lbmodel.n_dim],
-			       double *m) {
+			       LB_Moments *m) {
   const double gamma = lbpar.gamma;
   int i, j, k;
 
@@ -343,11 +357,11 @@ inline static void mlb_calc_xi(double Xi[][lbmodel.n_dim][lbmodel.n_dim],
     Dpuu[lbmodel.n_dim][lbmodel.n_dim][lbmodel.n_dim],
     divu;
 
-  double *rho   = m;
-  double *p     = m + 6;
-  double *pmrdp = m + 8;
-  double *u     = m + 12;
-  double *jcorr = m + 14;
+  double *rho   = &(m->rho);   // m
+  double *p     = &(m->p);     // m + 6
+  double *pmrdp = &(m->pmrdp); // m + 8
+  double *u     = m->u;        // m + 12
+  double *jcorr = m->jcorr;    // m + 14
 
   firstDer(Dr, rho);
   firstDer(Dp, p);
@@ -389,16 +403,16 @@ inline static void mlb_calc_xi(double Xi[][lbmodel.n_dim][lbmodel.n_dim],
 
 void mlb_correction_collisions(double *f) {
   const double (*c)[lbmodel.n_dim] = lbmodel.c;
+  LB_Moments *m = (LB_Moments *)(f + lblattice.halo_grid_volume*lbmodel.n_vel);
   int i, j, k, l;
-  double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
   double rho, cs2, jc, sc, xc;
   double w[lbmodel.n_vel];
   double Sigma[lbmodel.n_dim][lbmodel.n_dim];
   double Xi[lbmodel.n_dim][lbmodel.n_dim][lbmodel.n_dim];
 
-  double *jcorr = m + 14;
+  double *jcorr = m->jcorr; // m + 14
 
-  rho = m[0];
+  rho = m->rho;
   cs2 = eq_state(rho);
   lb_weights(w, cs2);
 

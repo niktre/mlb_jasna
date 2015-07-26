@@ -66,6 +66,19 @@ typedef struct _Lattice {
   int nb_offset[NVEL];
 } LB_Lattice;
 
+typedef struct _LBmoments {
+  double rho;
+  double j[NDIM];
+  double pi[NDIM*(NDIM+1)/2];
+  double p;
+  double dp;
+  double pmrdp;
+  double rd2p;
+  double force[NDIM];
+  double u[NDIM];
+  double jcorr[NDIM];
+} LB_Moments;
+
 /***********************************************************************/
 
 static const double d2q21_velocities[21][2] = { {  0.,  0. },
@@ -118,6 +131,8 @@ inline static void lb_weights(double *w, double sigma2) {
     w[13+i] = w[13];
     w[17+i] = w[17];
   }
+
+  //fprintf(stderr, "cs2=%f w=(%f,%f,%f,%f,%f,%f)\n", sigma2, w[0],w[1],w[5],w[9],w[13],w[17]);
 
 }
 
