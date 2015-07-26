@@ -35,13 +35,13 @@ static double dpsi(double rho) {
 }
 
 static double intpsi(double rho) {
-  return A*(Rs-R1)/M_PI*(1.0 - cos(M_PI*(rho-R1)/(R2-R1)));
+  return A*(R2-R1)/M_PI*(1.0 - cos(M_PI*(rho-R1)/(R2-R1)));
 }
 
 /***********************************************************************/
 
 static double eq_state(double rho) {
-  double cs2, integral;
+  double cs2;
   
   if (rho <= R1 || rho >= R3) {
     cs2 = S1;
