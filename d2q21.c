@@ -198,7 +198,7 @@ static void lb_collisions(double *f, int x, int y) {
 
   mlb_interface_collisions(f);
 
-  mlb_correction_collisions(f);
+  //mlb_correction_collisions(f);
 
 }
 
@@ -494,6 +494,35 @@ void lb_finalize() {
 
 /***********************************************************************/
 
+void lb_dens_mom() {
+  int x, y, xl, xh, yl, yh, xoff;
+  double rho, j[lbmodel.n_dim];
+  double *m = lbf + lblattice.halo_grid_volume*lbmodel.n_vel;
+
+  xl = lblattice.halo_size[0];
+  xh = lblattice.halo_size[0] + lblattice.grid[0];
+  yl = lblattice.halo_size[1];
+  yh = lblattice.halo_size[1] + lblattice.grid[1];
+
+  xoff = lblattice.halo_grid[0] - (xh - xl);
+
+  m += lbmodel.n_vel*(lblattice.stride[0]*xl+yl);
+
+  rho = j[0] = j[1] = 0.0;
+  for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
+    for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
+      rho  += m[0];
+      j[0] += m[1];
+      j[1] += m[2];
+    }
+  }
+
+  fprintf(stderr, "rho = %f j = (%f,%f)\n", rho, j[0], j[1]);
+
+}
+
+/***********************************************************************/
+
 void write_profile(int write_halo) {
   int x, y, xl, xh, yl, yh, xoff;
   double rho, j[lbmodel.n_dim];
@@ -563,6 +592,7 @@ int main(int argc, char *argv[]) {
   start = (double) clock();
   for (i=0; i<n_steps; ++i) {
     lb_update();
+    lb_dens_mom();
   }
   finish = (double) clock();
 
