@@ -284,7 +284,7 @@ void mlb_interface_collisions(double *f) {
   double rho, cs2, fc, *force = m->force;
   double w[lbmodel.n_vel];
 
-  rho = RHO_MEAN;
+  rho = m->rho;//RHO_MEAN;
   cs2 = eq_state(rho);
   lb_weights(w, cs2);
 
@@ -389,7 +389,9 @@ inline static void mlb_calc_xi(double Xi[][lbmodel.n_dim][lbmodel.n_dim],
   double *u     = m->u;        // m + 12
   double *jcorr = m->jcorr;    // m + 14
 
-  double cs2 = eq_state(RHO_MEAN);
+  double cs2 = eq_state(*rho);//(RHO_MEAN);
+
+  //fprintf(stderr, "cs2= %f p/rho = %f\t%f\n",cs2,*p/(*rho),cs2-*p/(*rho));
 
   firstDer(Dr, rho);
   firstDer(Dp, p);
@@ -440,7 +442,7 @@ void mlb_correction_collisions(double *f) {
 
   double *jcorr = m->jcorr; // m + 14
 
-  rho = RHO_MEAN;
+  rho = m->rho;//RHO_MEAN;
   cs2 = eq_state(rho);
   lb_weights(w, cs2);
 
