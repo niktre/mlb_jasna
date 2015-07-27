@@ -213,12 +213,13 @@ static void mlb_init_current(double *m) {
       lbmom->force[0] = force[0];
       lbmom->force[1] = force[1];
 
-      /* Step 3 */
-      lbmom->u[0] = (lbmom->j[0] + 0.5*force[0])/rho;
-      lbmom->u[1] = (lbmom->j[1] + 0.5*force[1])/rho;
-
+      /* correction current */
       //lbmom->jcorr[0] = 0.0; /* correction current */
       //lbmom->jcorr[1] = 0.0;
+
+      /* Step 3 */
+      lbmom->u[0] = (lbmom->j[0] + 0.5*force[0] + lbmom->jcorr[0])/rho;
+      lbmom->u[1] = (lbmom->j[1] + 0.5*force[1] + lbmom->jcorr[1])/rho;
 
     }
   }
