@@ -389,6 +389,8 @@ inline static void mlb_calc_xi(double Xi[][lbmodel.n_dim][lbmodel.n_dim],
   double *u     = m->u;        // m + 12
   double *jcorr = m->jcorr;    // m + 14
 
+  double cs2 = eq_state(RHO_MEAN);
+
   firstDer(Dr, rho);
   firstDer(Dp, p);
   firstDer(Du[0], &u[0]);
@@ -415,7 +417,7 @@ inline static void mlb_calc_xi(double Xi[][lbmodel.n_dim][lbmodel.n_dim],
 			    + delta(i,j) * ( *p*Dpr[k] + *pmrdp*u[k]*divu )
 			    + delta(j,k) * ( *p*Dpr[i] + *pmrdp*u[i]*divu )
 			    + delta(k,i) * ( *p*Dpr[j] + *pmrdp*u[j]*divu ) ) );
-	Xi[i][j][k] += ( (1. - gamma) * *p / *rho
+	Xi[i][j][k] -= ( (gamma - 1.) * cs2
 			* ( delta(i,j)*jcorr[k]
 			    + delta(j,k)*jcorr[i]
 			    + delta(k,i)*jcorr[j] ) );
