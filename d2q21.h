@@ -29,7 +29,7 @@
 #define NVEL 21
 #define NFD  13
 #define VMAX 4
-#define HALO 8
+#define HALO 4
 #define WGRID (2*VMAX+1)
 
 /***********************************************************************/
