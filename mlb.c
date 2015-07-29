@@ -53,15 +53,15 @@ static void mlb_calc_current(double *jc, LB_Moments *m, int x, int y) {
   double *pmrdp = &(m->pmrdp); // m + 8
   double *u     = m->u;        // m + 12
 
-  //for (i=0; i<lbmodel.n_dim; ++i) {
-  //  Dp[i] = 0.;
-  //  Dpmrdp[i] = 0.;
-  //  Du[0][i] = Du[1][i] = 0.;
-  //  for (j=0; j<lbmodel.n_dim; ++j) {
-  //    D2u[0][i][j] = 0.;
-  //    D2u[1][i][j] = 0.;
-  //  }
-  //}
+  for (i=0; i<lbmodel.n_dim; ++i) {
+    Dp[i] = 0.;
+    Dpmrdp[i] = 0.;
+    Du[0][i] = Du[1][i] = 09.;
+    for (j=0; j<lbmodel.n_dim; ++j) {
+      D2u[0][i][j] = 0.;
+      D2u[1][i][j] = 0.;
+    }
+  }
 
   firstDer(Dp, p);
   firstDer(Dpmrdp, pmrdp);
@@ -85,10 +85,10 @@ static void mlb_calc_current(double *jc, LB_Moments *m, int x, int y) {
     jc[i] /= -12.;
   }
 
-  //double norm = jc[0]*jc[0]+jc[1]*jc[1];
-  //if (norm > 1.) {
-  //  fprintf(stderr, "Warning! Large correction current jc = (%f,%f)\n", jc[0],jc[1]);
-  //}
+  double norm = jc[0]*jc[0]+jc[1]*jc[1];
+  if (norm > 1.) {
+    fprintf(stderr, "Warning! Large correction current jc = (%f,%f)\n", jc[0],jc[1]);
+  }
 
   //jc[0] = Dpmrdp[0] * divu;
   //jc[1] = Dpmrdp[1] * divu;
@@ -127,10 +127,10 @@ static void ic_read(double *dmax, LB_Moments *m, int x, int y) {
   jc[0] = jnew[0];
   jc[1] = jnew[1];
 
-  //double norm = jc[0]*jc[0]+jc[1]*jc[1];
-  //if (norm > 1.) {
-  //  fprintf(stderr, "Warning! Large correction current jc = (%f,%f)\n", jc[0],jc[1]);
-  //}
+  double norm = jc[0]*jc[0]+jc[1]*jc[1];
+  if (norm > 1e3) {
+    fprintf(stderr, "Warning! Large correction current jc = (%f,%f)\n", jc[0],jc[1]);
+  }
 
 }
 
@@ -250,7 +250,7 @@ void mlb_correction_current(double *m0) {
 
     /* no information is `streaming' so we loop the internal region */
     xl = lblattice.halo_size[0];
-    xh = lblattice.halo_size[0]+lblattice.grid[0];
+    xh = lblattice.halo_size[0]+lblattice.grid[0]+VMAX;
 
     /* Columns in the lower range will read only */
     for (x=xl, m+=xl*xstride; x<xl+VMAX; ++x, m+=xstride) {
@@ -259,13 +259,13 @@ void mlb_correction_current(double *m0) {
 
     /* Calculate the correction current but do not overwrite the column yet
      * x-MAXV can be overwritten with the updated current */
-    for (x=xl+VMAX; x<xh; ++x, m+=xstride) {
+    for (x=xl+VMAX; x<xh-VMAX; ++x, m+=xstride) {
       ic_read_column(&dmax, m, x);
       ic_write_column(m-VMAX*xstride, x-VMAX);
     }
 
     /* Columns in the higher range will write only */
-    for (x=xh; x<xh+VMAX; ++x, m+=xstride) {
+    for (x=xh-VMAX; x<xh; ++x, m+=xstride) {
       ic_write_column(m-VMAX*xstride, x-VMAX);
     }
 
