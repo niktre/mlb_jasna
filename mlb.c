@@ -41,6 +41,31 @@ void mlb_calc_force(double *force, LB_Moments *m, int x, int y) {
 
 /***********************************************************************/
 
+static void mlb_construct_matrix(double *m) {
+  int x, y, xl, xh, yl, yh, xoff;
+  double rho, p, dp, d2p;
+
+  xl = lblattice.halo_size[0];
+  xh = lblattice.halo_size[0] + lblattice.grid[0];
+  yl = lblattice.halo_size[1];
+  yh = lblattice.halo_size[1] + lblattice.grid[1];
+
+  xoff = lblattice.halo_grid[0] - (xh - xl);
+
+  m += lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
+
+  for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
+    for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
+
+      LB_Moments *lbm = (LB_Moments *)m;
+
+    }
+  }
+
+}
+
+/***********************************************************************/
+
 static void mlb_calc_current(double *jc, LB_Moments *m, int x, int y) {
   int i, j;
   double Dp[lbmodel.n_dim],
