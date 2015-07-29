@@ -41,9 +41,11 @@ void mlb_calc_force(double *force, LB_Moments *m, int x, int y) {
 
 /***********************************************************************/
 
-static void mlb_construct_matrix(double *m) {
-  int x, y, xl, xh, yl, yh, xoff;
-  double rho, p, dp, d2p;
+inline static void mlb_construct_matrix(double **M, double *m) {
+  int i, j, k, x, y, xl, xh, yl, yh, xoff, xstride;
+  int ind, nbi;
+  double *p, *pmrdp;
+  double Dp[lbmodel.n_dim], Dpmrdp[lbmodel.n_dim];
 
   xl = lblattice.halo_size[0];
   xh = lblattice.halo_size[0] + lblattice.grid[0];
@@ -59,6 +61,41 @@ static void mlb_construct_matrix(double *m) {
 
       LB_Moments *lbm = (LB_Moments *)m;
 
+      ind = x*xstride + y;
+
+      p     = &(lbm->p);     // m + 6
+      pmrdp = &(lbm->pmrdp); // m + 8
+
+      firstDer(Dp, p);
+      firstDer(Dpmrdp, pmrdp);
+
+      double **tau, **c, **first, **second;
+
+      for (i=0; i<lbmodel.n_fd; ++i) {
+
+	nbi = ind + lblattice.nb_offset[k];
+
+	M[ind][nbi] = 0.0;
+
+	for (j=0; j<lbmodel.n_dim; ++j) {
+	  for (k=0; k<lbmodel.n_dim; ++k) M[ind+j][nbi+k] = 0.;
+	  for (k=0; k<lbmodel.n_dim; ++k) {
+	    M[ind+j][nbi+k] = Dpmrdp[j] * tau[0][i]*c[i][k];
+	    //jc[j] += Dpmrdp[j] * Du[k][k];
+	    M[ind+j][nbi+j] += Dp[k] * first[i][k];//tau[0][i]*c[i][k];
+	    M[ind+j][nbi+k] += Dp[k] * first[i][j];//tau[0][i]*c[i][j];
+	    //jc[j] += Dp[k] * (Du[j][k] + Du[k][j]);
+	    M[ind+j][nbi+k] += (*pmrdp + *p) * second[j][k];
+	    //jc[j] += (*pmrdp + *p) * D2u[k][j][k];
+	    M[ind+j][nbi+j] += *p * second[k][k];
+	    //jc[j] += *p * D2u[j][k][k];
+	  }
+	  for (k=0; k<lbmodel.n_dim; ++k) M[ind+j][nbi+k] /= -12.;
+	  //jc[j] /= -12.;
+	}
+
+      }
+
     }
   }
 
@@ -71,8 +108,7 @@ static void mlb_calc_current(double *jc, LB_Moments *m, int x, int y) {
   double Dp[lbmodel.n_dim],
     Dpmrdp[lbmodel.n_dim],
     Du[lbmodel.n_dim][lbmodel.n_dim],
-    D2u[lbmodel.n_dim][lbmodel.n_dim][lbmodel.n_dim],
-    divu;
+    D2u[lbmodel.n_dim][lbmodel.n_dim][lbmodel.n_dim];
 
   double *p     = &(m->p);     // m + 6
   double *pmrdp = &(m->pmrdp); // m + 8
@@ -95,14 +131,10 @@ static void mlb_calc_current(double *jc, LB_Moments *m, int x, int y) {
     secDerAB(D2u[i], &u[i]);
   }
 
-  divu = 0.0;
   for (i=0; i<lbmodel.n_dim; ++i) {
-    divu += Du[i][i];
-  }
-
-  for (i=0; i<lbmodel.n_dim; ++i) {
-    jc[i] = Dpmrdp[i] * divu;
+    jc[i] = 0.0;
     for (j=0; j<lbmodel.n_dim; ++j) {
+      jc[i] += Dpmrdp[i] * Du[j][j];
       jc[i] += Dp[j] * (Du[i][j] + Du[j][i]);
       jc[i] += (*pmrdp + *p) * D2u[j][i][j];
       jc[i] += *p * D2u[i][j][j];
@@ -360,11 +392,14 @@ inline static void mlb_calc_sigma(double Sigma[][lbmodel.n_dim], LB_Moments *m) 
   secDerAB(D2u[0], &u[0]);
   secDerAB(D2u[1], &u[1]);
 
-  /* Step 10 and 11 */
   divu = divj = 0.;
   for (i=0; i<lbmodel.n_dim; ++i) {
     divu += Du[i][i];
     divj += Dr[i]*u[i] + *rho*Du[i][i];
+  }
+
+  /* Step 10 and 11 */
+  for (i=0; i<lbmodel.n_dim; ++i) {
     Dpdu[i] = ( Dp[0] * ( Du[0][i] + Du[i][1] )
 		+ Dp[1] * ( Du[1][i] + Du[i][1] )
 		+ *p * ( D2u[0][0][i] + D2u[1][1][i]
