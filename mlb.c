@@ -52,16 +52,6 @@ static void mlb_calc_current(double *jc, LB_Moments *m, int x, int y) {
   double *pmrdp = &(m->pmrdp); // m + 8
   double *u     = m->u;        // m + 12
 
-  //for (i=0; i<lbmodel.n_dim; ++i) {
-  //  Dp[i] = 0.;
-  //  Dpmrdp[i] = 0.;
-  //  Du[0][i] = Du[1][i] = 0.;
-  //  for (j=0; j<lbmodel.n_dim; ++j) {
-  //    D2u[0][i][j] = 0.;
-  //    D2u[1][i][j] = 0.;
-  //  }
-  //}
-
   firstDer(Dp, p);
   firstDer(Dpmrdp, pmrdp);
   for (i=0; i<lbmodel.n_dim; ++i) {
@@ -80,61 +70,21 @@ static void mlb_calc_current(double *jc, LB_Moments *m, int x, int y) {
     jc[i] /= -12.;
   }
 
-  //double norm = jc[0]*jc[0]+jc[1]*jc[1];
-  //if (norm > 1.) {
-  //  fprintf(stderr, "Warning! Large correction current jc = (%f,%f)\n", jc[0],jc[1]);
-  //}
-
-  //jc[0] = Dpmrdp[0] * divu;
-  //jc[1] = Dpmrdp[1] * divu;
-  //
-  //jc[0] += Dp[0] * (Du[0][0] + Du[0][0]) + Dp[1] * (Du[0][1] + Du[1][0]);
-  //jc[1] += Dp[0] * (Du[1][0] + Du[0][1]) + Dp[1] * (Du[1][1] + Du[1][1]);
-  //
-  //jc[0] += (*pmrdp + *p) * (D2u[0][0][0] + D2u[1][0][1]);
-  //jc[1] += (*pmrdp + *p) * (D2u[0][1][0] + D2u[1][1][1]);
-  //
-  //jc[0] += *p * (D2u[0][0][0] + D2u[0][1][1]);
-  //jc[1] += *p * (D2u[1][0][0] + D2u[1][1][1]);
-  //
-  //jc[0] *= - 1./12.;
-  //jc[1] *= - 1./12.;
-
-  //jc[0] = 0.0;
-  //jc[1] = 0.0;
-
 }
 
 /***********************************************************************/
 
-static void mlb_construct_matrix(double *m0) {
-  const double (*tau)[lbmodel.n_fd] = lbmodel.fd_weights;
-  const double (*c)[lbmodel.n_dim] = lbmodel.c;
+inline static void mlb_construct_matrix(double **M, double *m0) {
   int i, j, k, x, y, xl, xh, yl, yh, xoff;
   int ind, nbi;
-  LB_Moments *lbm;
   double *m, *p, *pmrdp;
   double Dp[lbmodel.n_dim], Dpmrdp[lbmodel.n_dim];
-
-  double ** M = malloc(lblattice.halo_grid_volume*2*sizeof(*M));
-  *M = calloc(lblattice.halo_grid_volume*2*lblattice.halo_grid_volume*2,sizeof(*M));
-  for (i=0; i<lblattice.halo_grid_volume*2; ++i) {
-    M[i] = *M + i*lblattice.halo_grid_volume*2;
-  }
 
   double first[lbmodel.n_fd][lbmodel.n_dim],
     second[lbmodel.n_fd][lbmodel.n_dim][lbmodel.n_dim];
 
-  for (i=0; i<lbmodel.n_fd; ++i) {
-    for (j=0; j<lbmodel.n_dim; ++j) {
-      first[i][j] = tau[0][i] * c[i][j];
-      for (k=0; k<lbmodel.n_dim; ++k) {
-	second[i][j][k]  = tau[2][i] * c[i][j] * c[i][k];
-	second[i][j][j] -= tau[2][i] * c[i][k] * c[i][k]/lbmodel.n_dim;
-      }
-      second[i][j][j] += tau[1][i]/lbmodel.n_dim;
-    }
-  }
+  firstDer_coeff(first);
+  secDer_coeff(second);
 
   xl = lblattice.halo_size[0];
   xh = lblattice.halo_size[0] + lblattice.grid[0];
@@ -148,108 +98,73 @@ static void mlb_construct_matrix(double *m0) {
   for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
     for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
 
-      lbm = (LB_Moments *)m;
-
       ind = 2*(x*lblattice.stride[0] + y);
 
-      p     = &(lbm->p);     // m + 6
-      pmrdp = &(lbm->pmrdp); // m + 8
+      p     = &(((LB_Moments *)m)->p);     // m + 6
+      pmrdp = &(((LB_Moments *)m)->pmrdp); // m + 8
 
       firstDer(Dp, p);
       firstDer(Dpmrdp, pmrdp);
 
-      for (i=0; i<lbmodel.n_fd; ++i) {
-
-	nbi = ind + lblattice.nb_offset[i]*2;
-
-	for (j=0; j<lbmodel.n_dim; ++j) {
-	  //for (k=0; k<lbmodel.n_dim; ++k) M[ind+j][nbi+k] = 0.;
-	  for (k=0; k<lbmodel.n_dim; ++k) {
-	    M[ind+j][nbi+k] += Dpmrdp[j] * tau[0][i]*c[i][k];
-	    //jc[j] += Dpmrdp[j] * Du[k][k];
-	    M[ind+j][nbi+j] += Dp[k] * first[i][k];
-	    M[ind+j][nbi+k] += Dp[k] * first[i][j];
-	    //jc[j] += Dp[k] * (Du[j][k] + Du[k][j]);
-	    M[ind+j][nbi+k] += (*pmrdp + *p) * second[i][j][k];
-	    //jc[j] += (*pmrdp + *p) * D2u[k][j][k];
-	    M[ind+j][nbi+j] += *p * second[i][k][k];
-	    //jc[j] += *p * D2u[j][k][k];
-	  }
-	  //for (k=0; k<lbmodel.n_dim; ++k) M[ind+j][nbi+k] /= -12.;
-	  //jc[j] /= -12.;
-	}
-
-      }
-
-    }
-  }
-
-  LB_Moments *m_nb;
-  double *jc, *u_nb;
-
-  m = m0 + lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
-
-  for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
-    for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
-
-      ind = 2*(x*lblattice.stride[0] + y);
-      lbm = (LB_Moments *)m;
-      jc  = lbm->jcorr_matrix;
-
       for (j=0; j<lbmodel.n_dim; ++j) {
 
-	jc[j] = 0.;
+	for (k=0; k<lbmodel.n_dim; ++k) {
+	  for (i=0; i<lbmodel.n_fd; ++i) {
+	    nbi = ind + lblattice.nb_offset[i]*2;
+	    M[ind+j][nbi+k] = 0.;
+	  }
+	}
 
-	for (i=0; i<lbmodel.n_dim; ++i) {
+	for (i=0; i<lbmodel.n_fd; ++i) {
 
-	  nbi = ind + lblattice.nb_offset[i]*2;
-
-	  m_nb = (LB_Moments *)(m + lblattice.nb_offset[i]*lbmodel.n_vel);
-	  u_nb = m_nb->u;
+	  nbi  = ind + lblattice.nb_offset[i]*2;
 
 	  for (k=0; k<lbmodel.n_dim; ++k) {
-
-	    jc[j] += -1./12.*M[ind+j][nbi+k] * u_nb[k];
-
+	    M[ind+j][nbi+k] += Dpmrdp[j] * first[i][k];
+	    M[ind+j][nbi+j] += Dp[k] * first[i][k];
+	    M[ind+j][nbi+k] += Dp[k] * first[i][j];
+	    M[ind+j][nbi+k] += (*pmrdp + *p) * second[i][j][k];
+	    M[ind+j][nbi+j] += *p * second[i][k][k];
 	  }
 
+	}
+
+	for (k=0; k<lbmodel.n_dim; ++k) {
+	  for (i=0; i<lbmodel.n_fd; ++i) {
+	    nbi = ind + lblattice.nb_offset[i]*2;
+	    M[ind+j][nbi+k] /= -12.;
+	  }
 	}
 
       }
 
     }
   }
-
-  free(*M);
-  free(M);
 
 }
 
 /***********************************************************************/
 
-inline static void matrix_current(double **M, double *m, int x, int y) {
+inline static void mlb_matrix_current(double *jc, double **M, LB_Moments *m, int x, int y) {
   int i, j, k, ind, nbi;
-  LB_Moments *lbm, *m_nb;
-  double *jc, *u_nb;
+  double *u, *u_nb;
 
   ind = 2*(x*lblattice.stride[0] + y);
-  lbm = (LB_Moments *)m;
-  jc  = lbm->jcorr_matrix;
+  u   = m->u;
 
   for (j=0; j<lbmodel.n_dim; ++j) {
 
     jc[j] = 0.;
 
-    for (i=0; i<lbmodel.n_dim; ++i) {
+    for (i=0; i<lbmodel.n_fd; ++i) {
 
       nbi = ind + lblattice.nb_offset[i]*2;
 
-      m_nb = (LB_Moments *)(m + lblattice.nb_offset[i]*lbmodel.n_vel);
-      u_nb = m_nb->u;
+      u_nb = u + lblattice.nb_offset[i]*lbmodel.n_vel;
 
       for (k=0; k<lbmodel.n_dim; ++k) {
 
-	jc[j] += -1./12.*M[ind+j][nbi+k] * u_nb[k];
+	jc[j] += M[ind+j][nbi+k] * u_nb[k];
 
       }
 
@@ -261,14 +176,17 @@ inline static void matrix_current(double **M, double *m, int x, int y) {
 
 /***********************************************************************/
 
-static void ic_read(double *dmax, LB_Moments *m, int x, int y) {
-  double jnew[lbmodel.n_dim], *jc = m->jcorr, *jc2 = m->jcorr_matrix, d;
+static void ic_read(double *dmax, double **M, LB_Moments *m, int x, int y) {
+  double jnew[lbmodel.n_dim], *jc = m->jcorr, d;
+  //double jc2[lbmodel.n_dim];
 
   jnew[0] = jnew[1] = 0.0;
 
   mlb_calc_current(jnew, m, x, y);
 
-  fprintf(stderr, "jnew = (%f,%f)\tjmatrix = (%f,%f)\n",jnew[0],jnew[1],jc2[0],jc2[1]);
+  //mlb_matrix_current(jc2, M, m, x, y);
+
+  //fprintf(stderr, "jnew = (%.9f,%.9f)\tjmatrix = (%.9f,%.9f)\n",jnew[0],jnew[1],jc2[0],jc2[1]);
 
   d = fabs(jnew[0] - jc[0]);
   if (d > *dmax) *dmax = d;
@@ -302,14 +220,14 @@ static void ic_write(LB_Moments *m, int x, int y) {
 
 /***********************************************************************/
 
-static void ic_read_column(double *dmax, double *m, int x) {
+static void ic_read_column(double *dmax, double **M, double *m, int x) {
   int y, yl, yh;
 
   yl = lblattice.halo_size[1];
   yh = lblattice.halo_size[1] + lblattice.grid[1] - 1;
 
   for (y=yl, m+=yl*lbmodel.n_vel; y<=yh; ++y, m+=lbmodel.n_vel) {
-    ic_read(dmax, (LB_Moments *)m, x, y);
+    ic_read(dmax, M, (LB_Moments *)m, x, y);
   }
 
 }
@@ -381,11 +299,17 @@ static void mlb_init_current(double *m) {
 
 void mlb_correction_current(double *m0) {
   double *m = m0;
-  int x, xl, xh;
+  int i, x, xl, xh;
   int xstride = lblattice.stride[0]*lbmodel.n_vel;
 
   int niter = 0;
   double dmax = 0.0;
+
+  double ** M = malloc(lblattice.halo_grid_volume*2*sizeof(*M));
+  *M = calloc(lblattice.halo_grid_volume*2*lblattice.halo_grid_volume*2,sizeof(*M));
+  for (i=0; i<lblattice.halo_grid_volume*2; ++i) {
+    M[i] = *M + i*lblattice.halo_grid_volume*2;
+  }
 
   lb_halo_copy(); /* need up to date densities in halo */
 
@@ -397,7 +321,7 @@ void mlb_correction_current(double *m0) {
 
     lb_halo_copy(); /* need up to date currents in halo */
 
-    mlb_construct_matrix(m);
+    //mlb_construct_matrix(M, m);
 
     //fprintf(stderr, "Starting iteration #%d of implicit algorithm...\n", niter);
 
@@ -407,13 +331,13 @@ void mlb_correction_current(double *m0) {
 
     /* Columns in the lower range will read only */
     for (x=xl, m+=xl*xstride; x<xl+VMAX; ++x, m+=xstride) {
-      ic_read_column(&dmax, m, x);
+      ic_read_column(&dmax, M, m, x);
     }
 
     /* Calculate the correction current but do not overwrite the column yet
      * x-MAXV can be overwritten with the updated current */
     for (x=xl+VMAX; x<xh-VMAX; ++x, m+=xstride) {
-      ic_read_column(&dmax, m, x);
+      ic_read_column(&dmax, M, m, x);
       ic_write_column(m-VMAX*xstride, x-VMAX);
     }
 
@@ -424,9 +348,12 @@ void mlb_correction_current(double *m0) {
 
     //fprintf(stderr, "Iteration #%d: dmax = %f\n", niter, dmax);
 
-  } while (0);//(dmax > TOLERANCE);
+  } while (dmax > TOLERANCE);
 
   fprintf(stderr, "Implicit algorithm converged after %d iteration(s).\n", niter);
+
+  free(*M);
+  free(M);
 
 }
   

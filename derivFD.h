@@ -8,6 +8,10 @@ void secDerAA (double *, double *);
 void secDerAB (double [][NDIM], double *);
 void thirdDer (double *, double *);
 
+void firstDer_coeff(double res[NDIM][NDIM]);
+void secDer_coeff(double res[NFD][NDIM][NDIM]);
+
+
 /***********************************************************************/
 
 static const double tau_derFirst[13] = { 0.,

@@ -451,7 +451,7 @@ static void lb_init_lattice(int *grid) {
     for (x=0; x<WGRID; ++x) {
       FI(i,x) = calloc(lblattice.halo_grid[1],sizeof(*FI(0,0)));
     }
-    lblattice.nb_offset[i] = (int)lbmodel.c[i][0]*hgrid[1]+(int)lbmodel.c[i][1];
+    lblattice.nb_offset[i] = (int)(lbmodel.c[i][0])*hgrid[1]+(int)(lbmodel.c[i][1]);
   }
 
 }
@@ -525,7 +525,7 @@ void lb_mass_mom(int i) {
 
 void write_profile(int write_halo) {
   int x, y, xl, xh, yl, yh, xoff;
-  double rho, j[lbmodel.n_dim];
+  double rho, j[lbmodel.n_dim], *u;
   double *m = lbf + lblattice.halo_grid_volume*lbmodel.n_vel;
   FILE *file;
 
@@ -552,7 +552,8 @@ void write_profile(int write_halo) {
       rho  = m[0];
       j[0] = m[1];
       j[1] = m[2];
-      fprintf(file,"%f %f %f %f\n",(double)x-xl,(double)y-yl,rho,j[0]/rho);
+      u = ((LB_Moments *)m)->u;
+      fprintf(file,"%f %f %f %f %f %f %f\n",(double)x-xl,(double)y-yl,rho,j[0]/rho,j[1]/rho,u[0],u[1]);
     }
   }
   fclose(file);

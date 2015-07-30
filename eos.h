@@ -13,8 +13,8 @@
 #include <stdlib.h>
 
 /* phase separation densities */
-#define RHO_LOW  1.2 //1.13 //0.577348
-#define RHO_HIGH 1.4 //1.47 //1.325965
+#define RHO_LOW  1.1 //1.13 //0.577348
+#define RHO_HIGH 1.2 //1.47 //1.325965
 #define RHO_MEAN ((RHO_LOW+RHO_HIGH)/2.0)
 
 /* constants that define equation of state: p/rho */
@@ -44,6 +44,7 @@ static double eq_state(double rho) {
   double cs2;
   
   if (rho <= R1 || rho >= R3) {
+    fprintf(stderr, "Don't like to be here with rho = %f\n", rho);
     cs2 = S1;
   } else if (rho < R3) {
     cs2 = S1 * exp(intpsi(rho));
