@@ -74,6 +74,42 @@ static void mlb_calc_current(double *jc, LB_Moments *m, int x, int y) {
 
 /***********************************************************************/
 
+inline static void mlb_matrix_current(double *jc, double **M, LB_Moments *m, int x, int y) {
+  int i, j, k, ind, nbi;
+  double rho, *u, *u_nb;
+
+  ind = 2*(x*lblattice.stride[0] + y);
+  rho = m->rho;
+  u   = m->u;
+
+  for (j=0; j<lbmodel.n_dim; ++j) {
+
+    jc[j] = 0.;
+
+    for (i=0; i<lbmodel.n_fd; ++i) {
+
+      nbi = ind + lblattice.nb_offset[i]*2;
+
+      u_nb = u + lblattice.nb_offset[i]*lbmodel.n_vel;
+
+      for (k=0; k<lbmodel.n_dim; ++k) {
+
+	jc[j] += M[ind+j][nbi+k] * u_nb[k];
+
+      }
+
+    }
+
+    jc[j] += u[j];
+
+    jc[j] *= rho;
+
+  }
+
+}
+
+/***********************************************************************/
+
 inline static void mlb_construct_matrix(double **M, double *b, double *m0) {
   int i, j, k, x, y, xl, xh, yl, yh, xoff;
   int ind, nbi;
@@ -146,37 +182,94 @@ inline static void mlb_construct_matrix(double **M, double *b, double *m0) {
 
 /***********************************************************************/
 
-inline static void mlb_matrix_current(double *jc, double **M, LB_Moments *m, int x, int y) {
-  int i, j, k, ind, nbi;
-  double rho, *u, *u_nb;
+void mlb_solve_matrix(double **M, double *b, double *m0) {
+  int i, j, x, y, x2, y2, xl, xh, yl, yh, xoff, ind, nbi, niter=0;
+  double *m, *phi, sigma, d, dmax;
 
-  ind = 2*(x*lblattice.stride[0] + y);
-  rho = m->rho;
-  u   = m->u;
+  phi = malloc(lblattice.halo_grid_volume*2*sizeof(*phi));
 
-  for (j=0; j<lbmodel.n_dim; ++j) {
+  xl = lblattice.halo_size[0];
+  xh = lblattice.halo_size[0] + lblattice.grid[0];
+  yl = lblattice.halo_size[1];
+  yh = lblattice.halo_size[1] + lblattice.grid[1];
 
-    jc[j] = 0.;
+  xoff = lblattice.halo_grid[0] - (xh - xl);
 
-    for (i=0; i<lbmodel.n_fd; ++i) {
-
-      nbi = ind + lblattice.nb_offset[i]*2;
-
-      u_nb = u + lblattice.nb_offset[i]*lbmodel.n_vel;
-
-      for (k=0; k<lbmodel.n_dim; ++k) {
-
-	jc[j] += M[ind+j][nbi+k] * u_nb[k];
-
+  /* load initial guess from LB moments */
+  m = m0 + lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
+  for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
+    for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
+      ind = 2*(x*lblattice.stride[0] + y);
+      for (j=0; j<lbmodel.n_dim; ++j) {
+	phi[ind+j] = ((LB_Moments *)m)->u[j];
       }
+    }
+  }
 
+  /* Gauss-Seidel iteration */
+  do {
+
+    dmax = 0.0; ++niter;
+
+    for (x=xl; x<xh; ++x) {
+      for (y=yl; y<yh; ++y) {
+	ind = 2*(x*lblattice.stride[0] + y);
+	for (i=0; i<lbmodel.n_dim; ++i) {
+	  sigma = 0.;
+	  for (x2=xl; x2<xh; ++x2) {
+	    for (y2=yl; y2<yh; ++y2) {
+	      nbi = 2*(x2*lblattice.stride[0] + y2);
+	      for (j=0; j<lbmodel.n_dim; ++j) {
+		sigma += M[ind+i][nbi+j]*phi[nbi+j];
+	      }
+	    }
+	  }
+	  if (fabs(M[ind+i][ind+i]) < 1.e-9) {
+	    fprintf(stderr, "Singular matrix (%d,%d)[%d]=%f!\n",x,y,i,M[ind+i][ind+i]);
+	  }
+	  sigma -= M[ind+i][ind+i]*phi[ind+i];
+	  sigma = (b[ind+i] - sigma)/M[ind+i][ind+i];
+	  d = fabs(phi[ind+i] - sigma);
+	  if (d > dmax) dmax = d;
+	  phi[ind+i] = sigma;
+	}
+      }
     }
 
-    jc[j] += u[j];
+#if 0
+    for (i=il; i<ih; ++i) {
+      sigma = 0.;
+      for (j=il; j<ih; ++j) {
+	sigma += M[i][j]*phi[j];
+      }
+      sigma -= M[i][i]*phi[i]; // subtract i=j contribution from loop above
+      if (fabs(M[i][i]) < 1.e-9) {
+	fprintf(stderr, "Singular matrix (%d,%d)=%f!\n",i,i,M[i][i]);
+      }
+      sigma = (b[i] - sigma)/M[i][i];
+      d = fabs(phi[i] - sigma);
+      if (d > dmax) dmax = d;
+      phi[i] = sigma;
+    }
+#endif
 
-    jc[j] *= rho;
+  } while (dmax > TOLERANCE);
 
+  fprintf(stderr, "Gauss-Seidel converged after %d iteration(s).\n", niter);
+
+  /* copy solution to LB moments */
+  m = m0 + lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
+  for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
+    for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
+      ind = 2*(x*lblattice.stride[0] + y);
+      for (j=0; j<lbmodel.n_dim; ++j) {
+	//fprintf(stderr, "phi[%d] = %f u(%d,%d)[%d] = %f\n",ind+j,phi[ind+j],x,y,j,((LB_Moments *)m)->u[j]);
+	((LB_Moments *)m)->u[j] = phi[ind+j];
+      }
+    }
   }
+
+  free(phi);
 
 }
 
@@ -192,7 +285,7 @@ static void ic_read(double *dmax, double **M, LB_Moments *m, int x, int y) {
 
   mlb_matrix_current(jc2, M, m, x, y);
 
-  fprintf(stderr, "jnew = (%.9f,%.9f)\tjmatrix = (%.9f,%.9f)\n",jnew[0],jnew[1],jc2[0],jc2[1]);
+  //fprintf(stderr, "jnew = (%.9f,%.9f)\tjmatrix = (%.9f,%.9f)\n",jnew[0],jnew[1],jc2[0],jc2[1]);
 
   d = fabs(jnew[0] - jc[0]);
   if (d > *dmax) *dmax = d;
@@ -320,7 +413,7 @@ void mlb_correction_current(double *m0) {
 
   lb_halo_copy(); /* need up to date densities in halo */
 
-  mlb_init_current(m);
+  mlb_init_current(m0);
 
   do {
 
@@ -328,7 +421,7 @@ void mlb_correction_current(double *m0) {
 
     lb_halo_copy(); /* need up to date currents in halo */
 
-    mlb_construct_matrix(M, b, m);
+    mlb_construct_matrix(M, b, m0);
 
     //fprintf(stderr, "Starting iteration #%d of implicit algorithm...\n", niter);
 
@@ -359,9 +452,12 @@ void mlb_correction_current(double *m0) {
 
   fprintf(stderr, "Implicit algorithm converged after %d iteration(s).\n", niter);
 
+  mlb_solve_matrix(M, b, m0);
+
   free(*M);
   free(M);
   free(b);
+
 }
   
 /***********************************************************************/
