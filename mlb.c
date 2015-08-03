@@ -100,9 +100,7 @@ inline static void mlb_matrix_current(double *jc, double **M, LB_Moments *m, int
 
     }
 
-    jc[j] += u[j];
-
-    jc[j] *= rho;
+    jc[j] += rho*u[j];
 
   }
 
@@ -127,7 +125,7 @@ inline static void mlb_construct_matrix(double **M, double *b, double *m0) {
   yl = lblattice.halo_size[1];
   yh = lblattice.halo_size[1] + lblattice.grid[1];
 
-  xoff = lblattice.halo_grid[0] - (xh - xl);
+  xoff = lblattice.stride[0] - (yh - yl);
 
   m = m0 + lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
 
@@ -164,14 +162,14 @@ inline static void mlb_construct_matrix(double **M, double *b, double *m0) {
 	  }
 
 	  for (k=0; k<lbmodel.n_dim; ++k) {
-	    M[ind+j][nbi+k] /= -12.**rho;
+	    M[ind+j][nbi+k] /= -12.;
 	  }
 
 	}
 
-	M[ind+j][ind+j] -= 1.;
+	M[ind+j][ind+j] -= *rho;
 
-	b[ind+j] = (q[j] + 0.5*f[j])/(*rho);
+	b[ind+j] = -(q[j] + 0.5*f[j]);
 
       }
 
@@ -182,18 +180,19 @@ inline static void mlb_construct_matrix(double **M, double *b, double *m0) {
 
 /***********************************************************************/
 
-void mlb_solve_matrix(double **M, double *b, double *m0) {
-  int i, j, x, y, x2, y2, xl, xh, yl, yh, xoff, ind, nbi, niter=0;
-  double *m, *phi, sigma, d, dmax;
+static void mlb_solve_matrix(double **M, double *b, double *m0) {
+  int i, j, k, x, y, x2, y2, xl, xh, yl, yh, xoff, ind, nbi, niter=0;
+  double *m, *phi, *phi_new, sigma, d, dmax;
 
   phi = malloc(lblattice.halo_grid_volume*2*sizeof(*phi));
+  phi_new = malloc(lblattice.halo_grid_volume*2*sizeof(*phi));
 
   xl = lblattice.halo_size[0];
   xh = lblattice.halo_size[0] + lblattice.grid[0];
   yl = lblattice.halo_size[1];
   yh = lblattice.halo_size[1] + lblattice.grid[1];
 
-  xoff = lblattice.halo_grid[0] - (xh - xl);
+  xoff = lblattice.stride[0] - (yh - yl);
 
   /* load initial guess from LB moments */
   m = m0 + lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
@@ -201,7 +200,7 @@ void mlb_solve_matrix(double **M, double *b, double *m0) {
     for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
       ind = 2*(x*lblattice.stride[0] + y);
       for (j=0; j<lbmodel.n_dim; ++j) {
-	phi[ind+j] = ((LB_Moments *)m)->u[j];
+	phi[ind+j] = 0.0;//((LB_Moments *)m)->u[j];
       }
     }
   }
@@ -214,27 +213,38 @@ void mlb_solve_matrix(double **M, double *b, double *m0) {
     for (x=xl; x<xh; ++x) {
       for (y=yl; y<yh; ++y) {
 	ind = 2*(x*lblattice.stride[0] + y);
-	for (i=0; i<lbmodel.n_dim; ++i) {
+	for (j=0; j<lbmodel.n_dim; ++j) {
 	  sigma = 0.;
-	  for (x2=xl; x2<xh; ++x2) {
-	    for (y2=yl; y2<yh; ++y2) {
-	      nbi = 2*(x2*lblattice.stride[0] + y2);
-	      for (j=0; j<lbmodel.n_dim; ++j) {
-		sigma += M[ind+i][nbi+j]*phi[nbi+j];
+	  //for (x2=xl; x2<xh; ++x2) {
+	  //  for (y2=yl; y2<yh; ++y2) {
+	  //    nbi = 2*(x2*lblattice.stride[0] + y2);
+	  for (i=0; i<lbmodel.n_fd; ++i) {
+	      nbi = ind + lblattice.nb_offset[i]*2;
+	      for (k=0; k<lbmodel.n_dim; ++k) {
+		sigma += M[ind+j][nbi+k]*phi[nbi+k];
 	      }
-	    }
+	      //}
 	  }
-	  if (fabs(M[ind+i][ind+i]) < 1.e-9) {
-	    fprintf(stderr, "Singular matrix (%d,%d)[%d]=%f!\n",x,y,i,M[ind+i][ind+i]);
-	  }
-	  sigma -= M[ind+i][ind+i]*phi[ind+i];
-	  sigma = (b[ind+i] - sigma)/M[ind+i][ind+i];
-	  d = fabs(phi[ind+i] - sigma);
+	  //if (fabs(M[ind+i][ind+i]) < 1.e-9) {
+	  //  fprintf(stderr, "Singular matrix (%d,%d)[%d]=%f!\n",x,y,i,M[ind+i][ind+i]);
+	  //}
+	  sigma -= M[ind+j][ind+j]*phi[ind+j];
+	  sigma = (b[ind+j] - sigma)/M[ind+j][ind+j];
+	  d = fabs(phi[ind+j] - sigma);
 	  if (d > dmax) dmax = d;
-	  phi[ind+i] = sigma;
+	  phi[ind+j] = sigma;
 	}
       }
     }
+
+    //for (x=xl; x<xh; ++x) {
+    //  for (y=yl; y<yh; ++y) {
+    //	ind = 2*(x*lblattice.stride[0] + y);
+    //	for (j=0; j<lbmodel.n_dim; ++j) {
+    //	  phi[ind+j] = phi_new[ind+j];
+    //	}
+    //  }
+    //}
 
 #if 0
     for (i=il; i<ih; ++i) {
@@ -263,8 +273,13 @@ void mlb_solve_matrix(double **M, double *b, double *m0) {
     for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
       ind = 2*(x*lblattice.stride[0] + y);
       for (j=0; j<lbmodel.n_dim; ++j) {
-	//fprintf(stderr, "phi[%d] = %f u(%d,%d)[%d] = %f\n",ind+j,phi[ind+j],x,y,j,((LB_Moments *)m)->u[j]);
-	((LB_Moments *)m)->u[j] = phi[ind+j];
+	fprintf(stderr, "phi[%d] = %f u(%d,%d)[%d] = %f\n",ind+j,phi[ind+j],x,y,j,((LB_Moments *)m)->u[j]);
+	double rho = ((LB_Moments *)m)->rho;
+	double *q  = ((LB_Moments *)m)->j;
+	double *u  = ((LB_Moments *)m)->u;
+	double *g  = ((LB_Moments *)m)->force;
+	((LB_Moments *)m)->u[j]     = phi[ind+j];
+	((LB_Moments *)m)->jcorr[j] = rho*u[j] - q[j] - 0.5*g[j];
       }
     }
   }
@@ -356,7 +371,7 @@ static void mlb_init_current(double *m) {
   yl = lblattice.halo_size[1];
   yh = lblattice.halo_size[1] + lblattice.grid[1];
 
-  xoff = lblattice.halo_grid[0] - (xh - xl);
+  xoff = lblattice.stride[0] - (yh - yl);
 
   m += lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
 
@@ -415,13 +430,13 @@ void mlb_correction_current(double *m0) {
 
   mlb_init_current(m0);
 
+  mlb_construct_matrix(M, b, m0);
+
   do {
 
     m = m0; dmax = 0.0; ++niter;
 
     lb_halo_copy(); /* need up to date currents in halo */
-
-    mlb_construct_matrix(M, b, m0);
 
     //fprintf(stderr, "Starting iteration #%d of implicit algorithm...\n", niter);
 
