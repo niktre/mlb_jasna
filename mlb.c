@@ -74,10 +74,10 @@ static void mlb_calc_current(double *jc, LB_Moments *m, int x, int y) {
 
 /***********************************************************************/
 
-inline static void mlb_construct_matrix(double **M, double *m0) {
+inline static void mlb_construct_matrix(double **M, double *b, double *m0) {
   int i, j, k, x, y, xl, xh, yl, yh, xoff;
   int ind, nbi;
-  double *m, *p, *pmrdp;
+  double *m, *rho, *q, *f, *p, *pmrdp;
   double Dp[lbmodel.n_dim], Dpmrdp[lbmodel.n_dim];
 
   double first[lbmodel.n_fd][lbmodel.n_dim],
@@ -100,24 +100,24 @@ inline static void mlb_construct_matrix(double **M, double *m0) {
 
       ind = 2*(x*lblattice.stride[0] + y);
 
+      rho   = &(((LB_Moments *)m)->rho);   // m + 0
+      q     =  (((LB_Moments *)m)->j);     // m + 1
       p     = &(((LB_Moments *)m)->p);     // m + 6
       pmrdp = &(((LB_Moments *)m)->pmrdp); // m + 8
+      f     =  (((LB_Moments *)m)->force); // m + 10
 
       firstDer(Dp, p);
       firstDer(Dpmrdp, pmrdp);
 
       for (j=0; j<lbmodel.n_dim; ++j) {
 
-	for (k=0; k<lbmodel.n_dim; ++k) {
-	  for (i=0; i<lbmodel.n_fd; ++i) {
-	    nbi = ind + lblattice.nb_offset[i]*2;
-	    M[ind+j][nbi+k] = 0.;
-	  }
-	}
-
 	for (i=0; i<lbmodel.n_fd; ++i) {
 
 	  nbi  = ind + lblattice.nb_offset[i]*2;
+
+	  for (k=0; k<lbmodel.n_dim; ++k) {
+	    M[ind+j][nbi+k] = 0.;
+	  }
 
 	  for (k=0; k<lbmodel.n_dim; ++k) {
 	    M[ind+j][nbi+k] += Dpmrdp[j] * first[i][k];
@@ -127,14 +127,15 @@ inline static void mlb_construct_matrix(double **M, double *m0) {
 	    M[ind+j][nbi+j] += *p * second[i][k][k];
 	  }
 
+	  for (k=0; k<lbmodel.n_dim; ++k) {
+	    M[ind+j][nbi+k] /= -12.**rho;
+	  }
+
 	}
 
-	for (k=0; k<lbmodel.n_dim; ++k) {
-	  for (i=0; i<lbmodel.n_fd; ++i) {
-	    nbi = ind + lblattice.nb_offset[i]*2;
-	    M[ind+j][nbi+k] /= -12.;
-	  }
-	}
+	M[ind+j][ind+j] -= 1.;
+
+	b[ind+j] = (q[j] + 0.5*f[j])/(*rho);
 
       }
 
@@ -147,9 +148,10 @@ inline static void mlb_construct_matrix(double **M, double *m0) {
 
 inline static void mlb_matrix_current(double *jc, double **M, LB_Moments *m, int x, int y) {
   int i, j, k, ind, nbi;
-  double *u, *u_nb;
+  double rho, *u, *u_nb;
 
   ind = 2*(x*lblattice.stride[0] + y);
+  rho = m->rho;
   u   = m->u;
 
   for (j=0; j<lbmodel.n_dim; ++j) {
@@ -170,6 +172,10 @@ inline static void mlb_matrix_current(double *jc, double **M, LB_Moments *m, int
 
     }
 
+    jc[j] += u[j];
+
+    jc[j] *= rho;
+
   }
 
 }
@@ -178,15 +184,15 @@ inline static void mlb_matrix_current(double *jc, double **M, LB_Moments *m, int
 
 static void ic_read(double *dmax, double **M, LB_Moments *m, int x, int y) {
   double jnew[lbmodel.n_dim], *jc = m->jcorr, d;
-  //double jc2[lbmodel.n_dim];
+  double jc2[lbmodel.n_dim];
 
   jnew[0] = jnew[1] = 0.0;
 
   mlb_calc_current(jnew, m, x, y);
 
-  //mlb_matrix_current(jc2, M, m, x, y);
+  mlb_matrix_current(jc2, M, m, x, y);
 
-  //fprintf(stderr, "jnew = (%.9f,%.9f)\tjmatrix = (%.9f,%.9f)\n",jnew[0],jnew[1],jc2[0],jc2[1]);
+  fprintf(stderr, "jnew = (%.9f,%.9f)\tjmatrix = (%.9f,%.9f)\n",jnew[0],jnew[1],jc2[0],jc2[1]);
 
   d = fabs(jnew[0] - jc[0]);
   if (d > *dmax) *dmax = d;
@@ -306,7 +312,8 @@ void mlb_correction_current(double *m0) {
   double dmax = 0.0;
 
   double ** M = malloc(lblattice.halo_grid_volume*2*sizeof(*M));
-  *M = calloc(lblattice.halo_grid_volume*2*lblattice.halo_grid_volume*2,sizeof(*M));
+  double *b   = calloc(lblattice.halo_grid_volume*2,sizeof(*b));
+  *M = calloc(lblattice.halo_grid_volume*2*lblattice.halo_grid_volume*2,sizeof(**M));
   for (i=0; i<lblattice.halo_grid_volume*2; ++i) {
     M[i] = *M + i*lblattice.halo_grid_volume*2;
   }
@@ -321,7 +328,7 @@ void mlb_correction_current(double *m0) {
 
     lb_halo_copy(); /* need up to date currents in halo */
 
-    //mlb_construct_matrix(M, m);
+    mlb_construct_matrix(M, b, m);
 
     //fprintf(stderr, "Starting iteration #%d of implicit algorithm...\n", niter);
 
@@ -354,7 +361,7 @@ void mlb_correction_current(double *m0) {
 
   free(*M);
   free(M);
-
+  free(b);
 }
   
 /***********************************************************************/
