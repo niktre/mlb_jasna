@@ -200,11 +200,12 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
     for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
       ind = 2*(x*lblattice.stride[0] + y);
       for (j=0; j<lbmodel.n_dim; ++j) {
-	phi[ind+j] = 0.0;//((LB_Moments *)m)->u[j];
+	phi[ind+j] = ((LB_Moments *)m)->u[j];
       }
     }
   }
 
+#ifndef MINRES
   /* Gauss-Seidel iteration */
   do {
 
@@ -228,11 +229,10 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
 	  //if (fabs(M[ind+i][ind+i]) < 1.e-9) {
 	  //  fprintf(stderr, "Singular matrix (%d,%d)[%d]=%f!\n",x,y,i,M[ind+i][ind+i]);
 	  //}
-	  sigma -= M[ind+j][ind+j]*phi[ind+j];
 	  sigma = (b[ind+j] - sigma)/M[ind+j][ind+j];
-	  d = fabs(phi[ind+j] - sigma);
+	  d = fabs(sigma);
 	  if (d > dmax) dmax = d;
-	  phi[ind+j] = sigma;
+	  phi[ind+j] += sigma;
 	}
       }
     }
@@ -266,6 +266,168 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
   } while (dmax > TOLERANCE);
 
   fprintf(stderr, "Gauss-Seidel converged after %d iteration(s).\n", niter);
+  //#else
+  /* MINRES */
+  double *ptmp=NULL;
+  double *r  = malloc(lblattice.halo_grid_volume*2*sizeof(*r));
+  double *p0 = malloc(lblattice.halo_grid_volume*2*sizeof(*r));
+  double *p1 = malloc(lblattice.halo_grid_volume*2*sizeof(*r));
+  double *p2 = malloc(lblattice.halo_grid_volume*2*sizeof(*r));
+  double *s0 = malloc(lblattice.halo_grid_volume*2*sizeof(*r));
+  double *s1 = malloc(lblattice.halo_grid_volume*2*sizeof(*r));
+  double *s2 = malloc(lblattice.halo_grid_volume*2*sizeof(*r));
+
+  double alpha, beta, r2, rdots, sdots, s0dots1, s1dots1, s0dots2, s2dots2;
+
+  r2 = 0.;
+  for (x=xl; x<xh; ++x) {
+    for (y=yl; y<yh; ++y) {
+      ind = 2*(x*lblattice.stride[0]+y);
+      for (j=0; j<lbmodel.n_dim; ++j) {
+	phi_new[ind+j] = phi[ind+j];
+	r[ind+j] = b[ind+j];
+	for (x2=xl; x2<xh; ++x2) {
+	  for (y2=yl; y2<yh; ++y2) {
+	    nbi = 2*(x2*lblattice.stride[0]+y2);
+	    for (k=0; k<lbmodel.n_dim; ++k) {
+	      r[ind+j] -= M[ind+j][nbi+k]*phi[nbi+k];
+	    }
+	  }
+	}
+	p0[ind+j] = r[ind+j];
+	r2 += r[ind+j]*r[ind+j];
+      }
+    }
+  }
+  sdots = 0.;
+  for (x=xl; x<xh; ++x) {
+    for (y=yl; y<yh; ++y) {
+      ind = 2*(x*lblattice.stride[0]+y);
+      for (j=0; j<lbmodel.n_dim; ++j) {
+	s0[ind+j] = 0.;
+	for (x2=xl; x2<xh; ++x2) {
+	  for (y2=yl; y2<yh; ++y2) {
+	    nbi = 2*(x2*lblattice.stride[0]+y2);
+	    for (k=0; k<lbmodel.n_dim; ++k) {
+	      s0[ind+j] += M[ind+j][nbi+k]*p0[nbi+k];
+	    }
+	  }
+	}
+	sdots += s0[ind+j]*s0[ind+j];
+      }
+    }
+  }
+
+  while (r2 > TOLERANCE*TOLERANCE) {
+
+    ++niter;
+
+    ptmp = p2; p2 = p1; p1 = p0; p0 = ptmp;
+    ptmp = s2; s2 = s1; s1 = s0; s0 = ptmp;
+
+    rdots = sdots = 0.;
+    for (x=xl; x<xh; ++x) {
+      for (y=yl; y<yh; ++y) {
+	ind = 2*(x*lblattice.stride[0]+y);
+	for (j=0; j<lbmodel.n_dim; ++j) {
+	  rdots +=  r[ind+j]*s1[ind+j];
+	  sdots += s1[ind+j]*s1[ind+j];
+	}
+      }
+    }
+    alpha = rdots/sdots;
+
+    r2 = 0.;
+    for (x=xl; x<xh; ++x) {
+      for (y=yl; y<yh; ++y) {
+	ind = 2*(x*lblattice.stride[0]+y);
+	for (j=0; j<lbmodel.n_dim; ++j) {
+	  phi[ind+j] += alpha*p1[ind+j];
+	  r[ind+j]   -= alpha*s1[ind+j];
+	  r2 += r[ind+j]*r[ind+j];
+	}
+      }
+    }
+
+    if (r2 < TOLERANCE*TOLERANCE) break;
+
+    s0dots1 = s1dots1 = s0dots2 = s2dots2 = 0.;
+    for (x=xl; x<xh; ++x) {
+      for (y=yl; y<yh; ++y) {
+	ind = 2*(x*lblattice.stride[0]+y);
+	for (j=0; j<lbmodel.n_dim; ++j) {
+	  p0[ind+j] = s1[ind+j];
+	  s0[ind+j] = 0.;
+	  for (x2=xl; x2<xh; ++x2) {
+	    for (y2=yl; y2<yh; ++y2) {
+	      nbi = 2*(x2*lblattice.stride[0]+y2);
+	      for (k=0; k<lbmodel.n_dim; ++k) {
+		s0[ind+j] += M[ind+j][nbi+k]*s1[nbi+k];
+	      }
+	    }
+	  }
+	  s0dots1 += s0[ind+j]*s1[ind+j];
+	  s0dots2 += s0[ind+j]*s2[ind+j];
+	  s1dots1 += s1[ind+j]*s1[ind+j];
+	  s2dots2 += s2[ind+j]*s2[ind+j];
+	}
+      }
+    }
+    //s0dots1 = s1dots1 = 0.;
+    //for (x=xl; x<xh; ++x) {
+    //  for (y=yl; y<yh; ++y) {
+    //	ind = 2*(x*lblattice.stride[0]+y);
+    //	for (j=0; j<lbmodel.n_dim; ++j) {
+    //	  s0dots1 += s0[ind+j]*s1[ind+j];
+    //	  s1dots1 += s1[ind+j]*s1[ind+j];
+    //	}
+    //  }
+    //}
+    beta = s0dots1/s1dots1;
+    for (x=xl; x<xh; ++x) {
+      for (y=yl; y<yh; ++y) {
+	ind = 2*(x*lblattice.stride[0]+y);
+	for (j=0; j<lbmodel.n_dim; ++j) {
+	  p0[ind+j] -= beta*p1[ind+j];
+	  s0[ind+j] -= beta*s1[ind+j];
+	}
+      }
+    }
+    if (niter > 1) {
+      //s0dots1 = s1dots1 = 0.;
+      //for (x=xl; x<xh; ++x) {
+      //	for (y=yl; y<yh; ++y) {
+      //	  ind = 2*(x*lblattice.stride[0]+y);
+      //	  for (j=0; j<lbmodel.n_dim; ++j) {
+      //	    s0dots1 += s0[ind+j]*s2[ind+j];
+      //	    s1dots1 += s2[ind+j]*s2[ind+j];
+      //	  }
+      //	}
+      //}
+      beta = s0dots2/s2dots2;
+      for (x=xl; x<xh; ++x) {
+	for (y=yl; y<yh; ++y) {
+	  ind = 2*(x*lblattice.stride[0]+y);
+	  for (j=0; j<lbmodel.n_dim; ++j) {
+	    p0[ind+j] -= beta*p2[ind+j];
+	    s0[ind+j] -= beta*s2[ind+j];
+	  }
+	}
+      }
+    }
+
+  }
+
+  fprintf(stderr, "MINRES converged after %d iteration(s).\n", niter);
+
+  free(r);
+  free(p0);
+  free(p1);
+  free(p2);
+  free(s0);
+  free(s1);
+  free(s2);
+#endif
 
   /* copy solution to LB moments */
   m = m0 + lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
@@ -273,7 +435,7 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
     for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
       ind = 2*(x*lblattice.stride[0] + y);
       for (j=0; j<lbmodel.n_dim; ++j) {
-	fprintf(stderr, "phi[%d] = %f u(%d,%d)[%d] = %f\n",ind+j,phi[ind+j],x,y,j,((LB_Moments *)m)->u[j]);
+	fprintf(stderr, "phi[%d] = %f phi_new[%d] = %f u(%d,%d)[%d] = %f\n",ind+j,phi[ind+j],ind+j,phi_new[ind+j],x,y,j,((LB_Moments *)m)->u[j]);
 	double rho = ((LB_Moments *)m)->rho;
 	double *q  = ((LB_Moments *)m)->j;
 	double *u  = ((LB_Moments *)m)->u;
