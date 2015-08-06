@@ -132,7 +132,8 @@ inline static void lb_weights(double *w, double sigma2) {
     w[17+i] = w[17];
   }
 
-  //fprintf(stderr, "cs2=%f w=(%f,%f,%f,%f,%f,%f)\n", sigma2, w[0],w[1],w[5],w[9],w[13],w[17]);
+  //double sum = w[0]+4.*(w[1]+w[5]+w[9]+w[13]+w[17]);
+  //fprintf(stderr, "cs2=%f w=(%f,%f,%f,%f,%f,%f) sum=%f\n", sigma2, w[0],w[1],w[5],w[9],w[13],w[17],sum);
 
 }
 

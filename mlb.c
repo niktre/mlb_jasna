@@ -10,10 +10,10 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
-#include "mkl_service.h"
-#include "mkl_trans.h"
-#include "mkl_blas.h"
-#include "mkl_lapack.h"
+//#include "mkl_service.h"
+//#include "mkl_trans.h"
+//#include "mkl_blas.h"
+//#include "mkl_lapack.h"
 #include "derivFD.h"
 #include "eos.h"
 
@@ -83,8 +83,13 @@ static void mlb_calc_current(double *jc, LB_Moments *m, int x, int y) {
 /***********************************************************************/
 
 inline static void mlb_matrix_current(double *jc, double **M, LB_Moments *m, int x, int y) {
-  int i, j, k, ind, nbi;
+  int j, k, x2, y2, xl, xh, yl, yh, ind, nbi;
   double rho, *u, *u_nb;
+
+  xl = lblattice.halo_size[0];
+  xh = lblattice.halo_size[0] + lblattice.grid[0];
+  yl = lblattice.halo_size[1];
+  yh = lblattice.halo_size[1] + lblattice.grid[1];
 
   ind = 2*(x*lblattice.stride[0] + y);
   rho = m->rho;
@@ -94,18 +99,20 @@ inline static void mlb_matrix_current(double *jc, double **M, LB_Moments *m, int
 
     jc[j] = 0.;
 
-    for (i=0; i<lbmodel.n_fd; ++i) {
+    for (x2=xl; x2<xh; ++x2) {
+      for (y2=yl; y2<yh; ++y2) {
 
-      nbi = ind + lblattice.nb_offset[i]*2;
+	nbi = 2*(x2*lblattice.stride[0]+y2);
 
-      u_nb = u + lblattice.nb_offset[i]*lbmodel.n_vel;
+	u_nb = u + (nbi-ind)/2*lbmodel.n_vel;
 
-      for (k=0; k<lbmodel.n_dim; ++k) {
+	for (k=0; k<lbmodel.n_dim; ++k) {
 
-	jc[j] += M[ind+j][nbi+k] * u_nb[k];
+	  jc[j] += M[ind+j][nbi+k] * u_nb[k];
+
+	}
 
       }
-
     }
 
     jc[j] += rho*u[j];
@@ -117,8 +124,8 @@ inline static void mlb_matrix_current(double *jc, double **M, LB_Moments *m, int
 /***********************************************************************/
 
 inline static void mlb_construct_matrix(double **M, double *b, double *m0) {
-  int i, j, k, x, y, xl, xh, yl, yh, xoff;
-  int ind, nbi;
+  int i, j, k, x, y, x2, y2, xl, xh, yl, yh, xoff;
+  int ind, nbi, nbf;
   double *m, *rho, *q, *f, *p, *pmrdp;
   double Dp[lbmodel.n_dim], Dpmrdp[lbmodel.n_dim];
 
@@ -153,6 +160,15 @@ inline static void mlb_construct_matrix(double **M, double *b, double *m0) {
 
       for (j=0; j<lbmodel.n_dim; ++j) {
 
+	for (x2=0; x2<lblattice.halo_grid[0]; ++x2) {
+	  for (y2=0; y2<lblattice.halo_grid[1]; ++y2) {
+	    nbi = 2*(x2*lblattice.stride[0]+y2);
+	    for (k=0; k<lbmodel.n_dim; ++k) {
+	      M[ind+j][nbi+k] = 0.;
+	    }
+	  }
+	}
+
 	for (i=0; i<lbmodel.n_fd; ++i) {
 
 	  nbi  = ind + lblattice.nb_offset[i]*2;
@@ -179,6 +195,48 @@ inline static void mlb_construct_matrix(double **M, double *b, double *m0) {
 
 	b[ind+j] = -(q[j] + 0.5*f[j]);
 
+      }
+
+    }
+  }
+
+  /* periodic boundary conditions */
+  for (x=xl; x<xh; ++x) {
+    for (y=yl; y<yh; ++y) {
+
+      ind = 2*(x*lblattice.stride[0]+y);
+
+      for (x2=0; x2<lblattice.halo_grid[0]; ++x2) {
+	for (y2=0; y2<lblattice.halo_grid[1]; ++y2) {
+
+	  nbi = 2*(x2*lblattice.stride[0]+y2);
+
+	  if (x2 < xl) {
+	    nbf = 2*(xh-xl+x2)*lblattice.stride[0];
+	  } else if (x2 >= xh) {
+	    nbf = 2*(xl-xh+x2)*lblattice.stride[0];
+	  } else {
+	    nbf = 2*x2*lblattice.stride[0];
+	  }
+
+	  if (y2 < yl) {
+	    nbf += 2*(yh-yl+y2);
+	  } else if (y2 >= yh) {
+	    nbf += 2*(yl-yh+y2);
+	  } else {
+	    nbf += 2*y2;
+	  }
+
+	  if (nbi != nbf) {
+	    for (j=0; j<lbmodel.n_dim; ++j) {
+	      for (k=0; k<lbmodel.n_dim; ++k) {
+		M[ind+j][nbf+k] += M[ind+j][nbi+k];
+		//M[ind+j][nbi+k] = 0.;
+	      }
+	    }
+	  }
+
+	}
       }
 
     }
@@ -681,8 +739,8 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
   memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
   minres(M, b, phi);
 
-  memcpy(phi_new, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
-  minres2(M, b, phi_new);
+  //memcpy(phi_new, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
+  //minres2(M, b, phi_new);
 
   //memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
   //mkl_factorise(M, b, phi);
@@ -693,7 +751,7 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
     for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
       ind = 2*(x*lblattice.stride[0] + y);
       for (j=0; j<lbmodel.n_dim; ++j) {
-	fprintf(stderr, "phi[%d] = %f phi_new[%d] = %f u(%d,%d)[%d] = %f\n",ind+j,phi[ind+j],ind+j,phi_new[ind+j],x,y,j,((LB_Moments *)m)->u[j]);
+	//fprintf(stderr, "phi[%d] = %f phi_new[%d] = %f u(%d,%d)[%d] = %f\n",ind+j,phi[ind+j],ind+j,phi_new[ind+j],x,y,j,((LB_Moments *)m)->u[j]);
 	double rho = ((LB_Moments *)m)->rho;
 	double *q  = ((LB_Moments *)m)->j;
 	double *u  = ((LB_Moments *)m)->u;
@@ -721,7 +779,7 @@ static void ic_read(double *dmax, double **M, LB_Moments *m, int x, int y) {
 
   mlb_matrix_current(jc2, M, m, x, y);
 
-  //fprintf(stderr, "jnew = (%.9f,%.9f)\tjmatrix = (%.9f,%.9f)\n",jnew[0],jnew[1],jc2[0],jc2[1]);
+  fprintf(stderr, "(%d,%d) jnew = (%.9f,%.9f)\tjmatrix = (%.9f,%.9f)\n",x,y,jnew[0],jnew[1],jc2[0],jc2[1]);
 
   d = fabs(jnew[0] - jc[0]);
   if (d > *dmax) *dmax = d;
@@ -850,6 +908,8 @@ void mlb_correction_current(double *m0) {
   lb_halo_copy(); /* need up to date densities in halo */
 
   mlb_init_current(m0);
+
+  lb_halo_copy(); /* need up to date quantities in halo */
 
   mlb_construct_matrix(M, b, m0);
 
