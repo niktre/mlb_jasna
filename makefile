@@ -2,9 +2,9 @@ NAME = run
 
 CLEANNAME = clean
 
-CC = gcc
+CC = icc
 CFLAGS += -Wall
-LFLAGS += -lm
+LFLAGS += -lm -lmkl_core -lmkl_intel_lp64 -lmkl_sequential
 
 HEADERS = eos.h mlb.h d2q21.h derivFD.h defs.h
 
