@@ -14,6 +14,9 @@
 
 #define TOLERANCE 1.e-3
 
+#define GAUSS_SEIDEL
+#define MINRES
+
 /***********************************************************************/
 
 void mlb_calc_force(double *force, LB_Moments *m, int x, int y) {
@@ -180,37 +183,17 @@ inline static void mlb_construct_matrix(double **M, double *b, double *m0) {
 
 /***********************************************************************/
 
-static void mlb_solve_matrix(double **M, double *b, double *m0) {
-  int i, j, k, x, y, x2, y2, xl, xh, yl, yh, xoff, ind, nbi, niter=0;
-  double *m, *phi, *phi_new, sigma, d, dmax;
-
-  phi = malloc(lblattice.halo_grid_volume*2*sizeof(*phi));
-  phi_new = malloc(lblattice.halo_grid_volume*2*sizeof(*phi));
+#ifdef GAUSS_SEIDEL
+static void gauss_seidel(double **M, double *b, double *phi) {
+  int i, j, k, x, y, xl, xh, yl, yh, ind, nbi, niter=0;
+  double sigma, d, dmax;
 
   xl = lblattice.halo_size[0];
   xh = lblattice.halo_size[0] + lblattice.grid[0];
   yl = lblattice.halo_size[1];
   yh = lblattice.halo_size[1] + lblattice.grid[1];
 
-  xoff = lblattice.stride[0] - (yh - yl);
-
-  /* load initial guess from LB moments */
-  m = m0 + lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
-  for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
-    for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
-      ind = 2*(x*lblattice.stride[0] + y);
-      for (j=0; j<lbmodel.n_dim; ++j) {
-	phi[ind+j] = 0.0;//((LB_Moments *)m)->u[j];
-      }
-    }
-  }
-
-#define GAUSS_SEIDEL
-#define MINRES
-#ifdef GAUSS_SEIDEL
   /* Gauss-Seidel iteration */
-
-  niter = 0;
 
   do {
 
@@ -272,25 +255,23 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
 
   fprintf(stderr, "Gauss-Seidel converged after %d iteration(s).\n", niter);
 
+}
 #endif
 
-#if defined MINRES
+/***********************************************************************/
 
-  double *ptmp;
-  ptmp = phi_new; phi_new = phi; phi  = ptmp;
+#ifdef MINRES
+static void minres(double **M, double *b, double *phi) {
+  int j, k, x, y, x2, y2, xl, xh, yl, yh, ind, nbi, niter=0;
+  double *ptmp=NULL;
 
-  /* load initial guess from LB moments */
-  m = m0 + lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
-  for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
-    for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
-      ind = 2*(x*lblattice.stride[0] + y);
-      for (j=0; j<lbmodel.n_dim; ++j) {
-	phi[ind+j] = 0.;//((LB_Moments *)m)->u[j];
-      }
-    }
-  }
+  xl = lblattice.halo_size[0];
+  xh = lblattice.halo_size[0] + lblattice.grid[0];
+  yl = lblattice.halo_size[1];
+  yh = lblattice.halo_size[1] + lblattice.grid[1];
 
   /* MINRES */
+
   double *r  = malloc(lblattice.halo_grid_volume*2*sizeof(*r));
   double *p0 = malloc(lblattice.halo_grid_volume*2*sizeof(*r));
   double *p1 = malloc(lblattice.halo_grid_volume*2*sizeof(*r));
@@ -338,8 +319,6 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
       }
     }
   }
-
-  niter = 0;
 
   while (r2 > TOLERANCE*TOLERANCE) {
 
@@ -450,7 +429,54 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
   free(s0);
   free(s1);
   free(s2);
+
+}
 #endif
+
+/***********************************************************************/
+
+static void mlb_solve_matrix(double **M, double *b, double *m0) {
+  int j, x, y, xl, xh, yl, yh, xoff, ind;
+  double *m, *phi, *phi_new;
+
+  phi = malloc(lblattice.halo_grid_volume*2*sizeof(*phi));
+  phi_new = malloc(lblattice.halo_grid_volume*2*sizeof(*phi));
+
+  xl = lblattice.halo_size[0];
+  xh = lblattice.halo_size[0] + lblattice.grid[0];
+  yl = lblattice.halo_size[1];
+  yh = lblattice.halo_size[1] + lblattice.grid[1];
+
+  xoff = lblattice.stride[0] - (yh - yl);
+
+  /* load initial guess from LB moments */
+  m = m0 + lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
+  for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
+    for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
+      ind = 2*(x*lblattice.stride[0] + y);
+      for (j=0; j<lbmodel.n_dim; ++j) {
+	phi[ind+j] = 0.0;//((LB_Moments *)m)->u[j];
+      }
+    }
+  }
+
+  gauss_seidel(M, b, phi);
+
+  double *ptmp;
+  ptmp = phi_new; phi_new = phi; phi = ptmp;
+
+  /* load initial guess from LB moments */
+  m = m0 + lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
+  for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
+    for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
+      ind = 2*(x*lblattice.stride[0] + y);
+      for (j=0; j<lbmodel.n_dim; ++j) {
+	phi[ind+j] = 0.;//((LB_Moments *)m)->u[j];
+      }
+    }
+  }
+
+  minres(M, b, phi);
 
   /* copy solution to LB moments */
   m = m0 + lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
@@ -470,6 +496,7 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
   }
 
   free(phi);
+  free(phi_new);
 
 }
 
