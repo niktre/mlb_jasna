@@ -504,7 +504,7 @@ void lb_mass_mom(int i) {
   yl = lblattice.halo_size[1];
   yh = lblattice.halo_size[1] + lblattice.grid[1];
 
-  xoff = lblattice.halo_grid[0] - (xh - xl);
+  xoff = lblattice.stride[0] - (yh - yl);
 
   m += lbmodel.n_vel*(lblattice.stride[0]*xl+yl);
 
@@ -542,7 +542,7 @@ void write_profile(int write_halo) {
     yh = lblattice.halo_size[1] + lblattice.grid[1];
   }
 
-  xoff = lblattice.halo_grid[0] - (xh - xl);
+  xoff = lblattice.stride[0] - (yh - yl);
 
   m += lbmodel.n_vel*(lblattice.stride[0]*xl+yl);
 
@@ -602,7 +602,7 @@ int main(int argc, char *argv[]) {
 
   fprintf(stdout, "Elapsed time: %.3f s (%.3e MUPS)\n", elapsed, mups); fflush(stdout); 
 
-  write_profile(0);
+  write_profile(1);
 
   lb_finalize();
 
