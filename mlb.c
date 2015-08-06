@@ -9,6 +9,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <string.h>
 #include "mkl_service.h"
 #include "mkl_trans.h"
 #include "mkl_blas.h"
@@ -439,9 +440,9 @@ static void minres(double **M, double *b, double *phi) {
 
 /***********************************************************************/
 
-static void minres2(double **M, double *b, double *sol) {
+static void minres2(double **M, double *b, double *phi) {
   int j, k, x, y, x2, y2, xl, xh, yl, yh, ind, nbi, niter=0;
-  double r2, alfa, beta, beta1, g1, g2, d1, d2, e1, e2, c, s, phi, tau;
+  double r2, alfa, beta, beta1, g1, g2, d1, d2, e1, e2, c, s, tau, eta;
   double *ptmp=NULL;
 
   xl = lblattice.halo_size[0];
@@ -467,7 +468,7 @@ static void minres2(double **M, double *b, double *sol) {
 	  for (y2=yl; y2<yh; ++y2) {
 	    nbi = 2*(x2*lblattice.stride[0]+y2);
 	    for (k=0; k<lbmodel.n_dim; ++k) {
-	      v[ind+j] -= M[ind+j][nbi+k]*sol[ind+k];
+	      v[ind+j] -= M[ind+j][nbi+k]*phi[nbi+k];
 	    }
 	  }
 	}
@@ -490,7 +491,7 @@ static void minres2(double **M, double *b, double *sol) {
   }
 
   r2  = beta;
-  tau = phi = beta;
+  tau = eta = beta;
   d1  = 0.;
   c   = -1.;
   s   = 0.;
@@ -511,7 +512,6 @@ static void minres2(double **M, double *b, double *sol) {
       for (y=yl; y<yh; ++y) {
 	ind = 2*(x*lblattice.stride[0]+y);
 	for (j=0; j<lbmodel.n_dim; ++j) {
-	  v1[ind+j] /= beta1;
 	  v[ind+j] = 0.;
 	  for (x2=xl; x2<xh; ++x2) {
 	    for (y2=yl; y2<yh; ++y2) {
@@ -540,26 +540,26 @@ static void minres2(double **M, double *b, double *sol) {
     /* QR factorisation */
 
     /* left orthogonalization by previous Givens rotation */
-    d2 =   c * d1 + s * alfa;
-    g1 =   s * d1 - c * alfa;
-    e1 =            s * beta;
-    d1 =          - c * beta;
+    d2 = c * d1 + s * alfa;
+    g1 = s * d1 - c * alfa;
+    e1 =          s * beta;
+    d1 =        - c * beta;
 
     /* new Givens rotation for subdiagonal */
     g2  = sqrt( g1*g1 + beta*beta );
     c   = g1 / g2;
     s   = beta / g2;
-    tau = c * phi;
-    phi = s * phi;
+    tau = c * eta;
+    eta = s * eta;
 
     /* update of solution */
     for (x=xl; x<xh; ++x) {
       for (y=yl; y<yh; ++y) {
 	ind = 2*(x*lblattice.stride[0]+y);
 	for (j=0; j<lbmodel.n_dim; ++j) {
-	  w[ind+j] = v1[ind+j] - d2*w1[ind+j] - e2*w2[ind+j];
-	  w[ind+j] /= g2;
-	  sol[ind+j] += tau*w[ind+j];
+	  v[ind+j]  /= beta;  /* normalize v now */
+	  w[ind+j]   = (v1[ind+j] - d2*w1[ind+j] - e2*w2[ind+j]) / g2;
+	  phi[ind+j] += tau*w[ind+j];
 	}
       }
     }
@@ -581,6 +581,7 @@ static void minres2(double **M, double *b, double *sol) {
 
 /***********************************************************************/
 
+#ifdef MKL
 static void mkl_factorise(double **M, double *b, double *phi) {
   int j, x, y, xl, xh, yl, yh, ind;
 
@@ -644,6 +645,7 @@ static void mkl_factorise(double **M, double *b, double *phi) {
   free(a);
 
 }
+#endif
 
 /***********************************************************************/
 
@@ -682,8 +684,8 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
   memcpy(phi_new, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
   minres2(M, b, phi_new);
 
-  memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
-  mkl_factorise(M, b, phi);
+  //memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
+  //mkl_factorise(M, b, phi);
 
   /* copy solution to LB moments */
   m = m0 + lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
