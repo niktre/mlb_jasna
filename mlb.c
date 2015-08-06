@@ -9,6 +9,10 @@
 
 #include <math.h>
 #include <stdio.h>
+#include "mkl_service.h"
+#include "mkl_trans.h"
+#include "mkl_blas.h"
+#include "mkl_lapack.h"
 #include "derivFD.h"
 #include "eos.h"
 
@@ -435,10 +439,219 @@ static void minres(double **M, double *b, double *phi) {
 
 /***********************************************************************/
 
+static void minres2(double **M, double *b, double *sol) {
+  int j, k, x, y, x2, y2, xl, xh, yl, yh, ind, nbi, niter=0;
+  double r2, alfa, beta, beta1, g1, g2, d1, d2, e1, e2, c, s, phi, tau;
+  double *ptmp=NULL;
+
+  xl = lblattice.halo_size[0];
+  xh = lblattice.halo_size[0] + lblattice.grid[0];
+  yl = lblattice.halo_size[1];
+  yh = lblattice.halo_size[1] + lblattice.grid[1];
+
+  double *v, *v1, *v2, *w, *w1, *w2;
+  v  = malloc(lblattice.halo_grid_volume*2*sizeof(*v));
+  v1 = malloc(lblattice.halo_grid_volume*2*sizeof(*v));
+  v2 = malloc(lblattice.halo_grid_volume*2*sizeof(*v));
+  w  = malloc(lblattice.halo_grid_volume*2*sizeof(*w));
+  w1 = malloc(lblattice.halo_grid_volume*2*sizeof(*w));
+  w2 = malloc(lblattice.halo_grid_volume*2*sizeof(*w));
+
+  beta = 0.;
+  for (x=xl; x<xh; ++x) {
+    for (y=yl; y<yh; ++y) {
+      ind = 2*(x*lblattice.stride[0]+y);
+      for (j=0; j<lbmodel.n_dim; ++j) {
+	v[ind+j] = b[ind+j];
+	for (x2=xl; x2<xh; ++x2) {
+	  for (y2=yl; y2<yh; ++y2) {
+	    nbi = 2*(x2*lblattice.stride[0]+y2);
+	    for (k=0; k<lbmodel.n_dim; ++k) {
+	      v[ind+j] -= M[ind+j][nbi+k]*sol[ind+k];
+	    }
+	  }
+	}
+	beta += v[ind+j]*v[ind+j];
+	v1[ind+j] = 0.;
+	w[ind+j]  = 0.;
+	w1[ind+j] = 0.;
+      }
+    }
+  }
+  beta  = sqrt(beta);
+
+  for (x=xl; x<xh; ++x) {
+    for (y=yl; y<yh; ++y) {
+      ind = 2*(x*lblattice.stride[0]+y);
+      for (j=0; j<lbmodel.n_dim; ++j) {
+	v[ind+j] /= beta;
+      }
+    }
+  }
+
+  r2  = beta;
+  tau = phi = beta;
+  d1  = 0.;
+  c   = -1.;
+  s   = 0.;
+
+  while (r2 > TOLERANCE) {
+
+    ++niter;
+
+    ptmp = v2; v2 = v1; v1 = v; v = ptmp;
+    ptmp = w2; w2 = w1; w1 = w; w = ptmp;
+
+    beta1 = beta;
+    e2    = e1;
+
+    /* Lanczos recurrence */
+    alfa = 0.0;
+    for (x=xl; x<xh; ++x) {
+      for (y=yl; y<yh; ++y) {
+	ind = 2*(x*lblattice.stride[0]+y);
+	for (j=0; j<lbmodel.n_dim; ++j) {
+	  v1[ind+j] /= beta1;
+	  v[ind+j] = 0.;
+	  for (x2=xl; x2<xh; ++x2) {
+	    for (y2=yl; y2<yh; ++y2) {
+	      nbi = 2*(x2*lblattice.stride[0]+y2);
+	      for (k=0; k<lbmodel.n_dim; ++k) {
+		v[ind+j] += M[ind+j][nbi+k]*v1[nbi+k];  /* r = A*v */
+	      }
+	    }
+	  }
+	  alfa += v1[ind+j]*v[ind+j];                   /* alfa = v'*r */
+	}
+      }
+    }
+
+    for (x=xl; x<xh; ++x) {
+      for (y=yl; y<yh; ++y) {
+	ind = 2*(x*lblattice.stride[0]+y);
+	for (j=0; j<lbmodel.n_dim; ++j) {
+	  v[ind+j] -= alfa*v1[ind+j] + beta1*v2[ind+j]; /* Lanczos update */
+	  beta += v[ind+j]*v[ind+j];                    /* beta = v'*v */
+	}
+      }
+    }
+    beta  = sqrt(beta);
+
+    /* QR factorisation */
+
+    /* left orthogonalization by previous Givens rotation */
+    d2 =   c * d1 + s * alfa;
+    g1 =   s * d1 - c * alfa;
+    e1 =            s * beta;
+    d1 =          - c * beta;
+
+    /* new Givens rotation for subdiagonal */
+    g2  = sqrt( g1*g1 + beta*beta );
+    c   = g1 / g2;
+    s   = beta / g2;
+    tau = c * phi;
+    phi = s * phi;
+
+    /* update of solution */
+    for (x=xl; x<xh; ++x) {
+      for (y=yl; y<yh; ++y) {
+	ind = 2*(x*lblattice.stride[0]+y);
+	for (j=0; j<lbmodel.n_dim; ++j) {
+	  w[ind+j] = v1[ind+j] - d2*w1[ind+j] - e2*w2[ind+j];
+	  w[ind+j] /= g2;
+	  sol[ind+j] += tau*w[ind+j];
+	}
+      }
+    }
+
+    r2 *= s;
+
+  }
+
+  fprintf(stderr, "MINRES2 converged after %d iteration(s).\n", niter);
+
+  free(v);
+  free(v1);
+  free(v2);
+  free(w);
+  free(w1);
+  free(w2);
+
+}
+
+/***********************************************************************/
+
+static void mkl_factorise(double **M, double *b, double *phi) {
+  int j, x, y, xl, xh, yl, yh, ind;
+
+  xl = lblattice.halo_size[0];
+  xh = lblattice.halo_size[0] + lblattice.grid[0];
+  yl = lblattice.halo_size[1];
+  yh = lblattice.halo_size[1] + lblattice.grid[1];
+
+  int i, *ipiv, info;
+  int n     = 2*(yh - yl)*(xh - xl);
+  int lda   = n;
+  int ldb   = n;
+  int nrhs  = 1;
+  int lwork = 64*n*sizeof(double);
+
+  double **a, *bb, *work;
+  char uplo = 'L';
+
+  a     = malloc(n*sizeof(*a));
+  ipiv  = malloc(n*sizeof(*ipiv));
+  *a    = mkl_malloc(n*n*sizeof(**a),16);
+  bb    = mkl_malloc(n*sizeof(*bb),16);
+  work  = mkl_malloc(64*n*sizeof(*work),16);
+
+  for (i=0; i<n; ++i) a[i] = a[0] + i*n;
+
+  int k, x0, y0, x2, y2, nbi;
+  for (x0=0, x=xl; x<xh; ++x) {
+    for (y=yl; y<yh; ++y) {
+      ind = 2*(x*lblattice.stride[0]+y);
+      for (j=0; j<lbmodel.n_dim; ++j, ++x0) {
+	for (y0=0, x2=xl; x2<xh; ++x2) {
+	  for (y2=yl; y2<yh; ++y2) {
+	    nbi = 2*(x2*lblattice.stride[0]+y2);
+	    for (k=0; k<lbmodel.n_dim; ++k, ++y0) {
+	      a[x0][y0] = M[ind+j][nbi+k];
+	    }
+	  }
+	}
+	bb[x0] = b[ind+j];
+      }
+    }
+  }
+
+  dsytrf(&uplo, &n, *a, &lda, ipiv, work, &lwork, &info);
+  dsytrs(&uplo, &n, &nrhs, *a, &lda, ipiv, bb, &ldb, &info);
+
+   for (x0=0, x=xl; x<xh; ++x) {
+    for (y=yl; y<yh; ++y) {
+      ind = 2*(x*lblattice.stride[0]+y);
+      for (j=0; j<lbmodel.n_dim; ++j, ++x0) {
+	phi[ind+j] = bb[x0];
+      }
+    }
+  }
+
+  mkl_free(work);
+  mkl_free(bb);
+  mkl_free(*a);
+  free(ipiv);
+  free(a);
+
+}
+
+/***********************************************************************/
+
 static void mlb_solve_matrix(double **M, double *b, double *m0) {
   int j, x, y, xl, xh, yl, yh, xoff, ind;
-  double *m, *phi, *phi_new;
+  double *m, *phi0, *phi, *phi_new;
 
+  phi0 = malloc(lblattice.halo_grid_volume*2*sizeof(*phi));
   phi = malloc(lblattice.halo_grid_volume*2*sizeof(*phi));
   phi_new = malloc(lblattice.halo_grid_volume*2*sizeof(*phi));
 
@@ -455,28 +668,22 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
     for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
       ind = 2*(x*lblattice.stride[0] + y);
       for (j=0; j<lbmodel.n_dim; ++j) {
-	phi[ind+j] = 0.0;//((LB_Moments *)m)->u[j];
+	phi0[ind+j] = 0.0;//((LB_Moments *)m)->u[j];
       }
     }
   }
 
+  memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
   gauss_seidel(M, b, phi);
 
-  double *ptmp;
-  ptmp = phi_new; phi_new = phi; phi = ptmp;
-
-  /* load initial guess from LB moments */
-  m = m0 + lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
-  for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
-    for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
-      ind = 2*(x*lblattice.stride[0] + y);
-      for (j=0; j<lbmodel.n_dim; ++j) {
-	phi[ind+j] = 0.;//((LB_Moments *)m)->u[j];
-      }
-    }
-  }
-
+  memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
   minres(M, b, phi);
+
+  memcpy(phi_new, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
+  minres2(M, b, phi_new);
+
+  memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
+  mkl_factorise(M, b, phi);
 
   /* copy solution to LB moments */
   m = m0 + lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
