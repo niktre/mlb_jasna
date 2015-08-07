@@ -664,7 +664,16 @@ static void minres2(double **M, double *b, double *phi) {
 
 /***********************************************************************/
 
-extern void __minresmodule_MOD_minres();
+extern void __minresmodule_MOD_minres(int *n,
+				void (*Aprod)(int *n, double *x, double *y),
+				void (*Msolve)(int *n, double *x, double *y),
+				double *b,
+				double *shift, int *checkA, int *precon,
+				double *phi, int *itnlimit, int *nout,
+				double *rtol, int *istop, int *itn,
+				double *Anorm, double *Acond,
+				double *rnorm, double *Arnorm,
+				double *ynorm);
 
   //!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
   //
@@ -698,47 +707,33 @@ extern void __minresmodule_MOD_minres();
   //
   //!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-static void Msolve(int *n, double *x, double *y) {
-  int i;
-  for (i=0; i<*n; ++i) y[i] = x[i];
-}
-
 static void minresf(double **M, double *b, double *phi) {
-  int i, j, k, l, x, y, x2, y2, xl, xh, yl, yh, ind, nbi;
+  int i, j, k, l, x1, y1, x2, y2, xl, xh, yl, yh, ind, nbi;
   int n, itnlimit, nout, istop, itn, checkA, precon;
   double shift, rtol, Anorm, Acond, rnorm, Arnorm, ynorm;
-  double **a;
-
-  void Aprod(int *n, double *x, double *y) {
-    int i, j;
-    for (i=0; i<*n; ++i) {
-      y[i] = 0.;
-      for (j=0; j<*n; ++j) {
-	y[i] += a[i][j]*x[j];
-      }
-    }
-  }
 
   n = 2*lblattice.grid[0]*lblattice.grid[1];
-
-  a  = malloc(n*sizeof(*a));
-  *a = calloc(n*n,sizeof(**a));
-  for (i=0; i<n; ++i) a[i] = a[0] + i*n;
 
   xl = lblattice.halo_size[0];
   xh = lblattice.halo_size[0] + lblattice.grid[0];
   yl = lblattice.halo_size[1];
   yh = lblattice.halo_size[1] + lblattice.grid[1];
 
-  for (x=xl, i=0; x<xh; ++x) {
-    for (y=yl; y<yh; ++y) {
-      ind = 2*(x*lblattice.stride[0]+y);
-      for (j=0; j<lbmodel.n_dim; ++j, ++i) {
-	for (x2=xl, l=0; x2<xh; ++x2) {
-	  for (y2=yl; y2<yh; ++y2) {
-	    nbi = 2*(x2*lblattice.stride[0]+y2);
-	    for (k=0; k<lbmodel.n_dim; ++k, ++l) {
-	      a[i][l] = M[ind+j][nbi+k];
+  void Msolve(int *n, double *x, double *y) {
+    for (i=0; i<*n; ++i) y[i] = x[i];
+  }
+
+  void Aprod(int *n, double *x, double *y) {
+    for (x1=xl, i=0; x1<xh; ++x1) {
+      for (y1=yl; y1<yh; ++y1) {
+	ind = 2*(x1*lblattice.stride[0]+y1);
+	for (j=0; j<lbmodel.n_dim; ++j, ++i) {
+	  for (x2=xl, l=0; x2<xh; ++x2) {
+	    for (y2=yl; y2<yh; ++y2) {
+	      nbi = 2*(x2*lblattice.stride[0]+y2);
+	      for (k=0; k<lbmodel.n_dim; ++k, ++l) {
+		y[i] = M[ind+j][nbi+k]*x[l];
+	      }
 	    }
 	  }
 	}
@@ -790,9 +785,9 @@ static void mkl_factorise(double **M, double *b, double *phi) {
   for (i=0; i<n; ++i) a[i] = a[0] + i*n;
 
   int k, x0, y0, x2, y2, nbi;
-  for (x0=0, x=xl; x<xh; ++x) {
-    for (y=yl; y<yh; ++y) {
-      ind = 2*(x*lblattice.stride[0]+y);
+  for (x0=0, x1=xl; x1<xh; ++x1) {
+    for (y1=yl; y1<yh; ++y1) {
+      ind = 2*(x1*lblattice.stride[0]+y1);
       for (j=0; j<lbmodel.n_dim; ++j, ++x0) {
 	for (y0=0, x2=xl; x2<xh; ++x2) {
 	  for (y2=yl; y2<yh; ++y2) {
@@ -810,9 +805,9 @@ static void mkl_factorise(double **M, double *b, double *phi) {
   dsytrf(&uplo, &n, *a, &lda, ipiv, work, &lwork, &info);
   dsytrs(&uplo, &n, &nrhs, *a, &lda, ipiv, bb, &ldb, &info);
 
-   for (x0=0, x=xl; x<xh; ++x) {
-    for (y=yl; y<yh; ++y) {
-      ind = 2*(x*lblattice.stride[0]+y);
+   for (x0=0, x1=xl; x1<xh; ++x1) {
+    for (y1=yl; y1<yh; ++y1) {
+      ind = 2*(x1*lblattice.stride[0]+y1);
       for (j=0; j<lbmodel.n_dim; ++j, ++x0) {
 	phi[ind+j] = bb[x0];
       }
