@@ -664,6 +664,104 @@ static void minres2(double **M, double *b, double *phi) {
 
 /***********************************************************************/
 
+extern void __minresmodule_MOD_minres();
+
+  //!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+  //
+  //subroutine MINRES( n, Aprod, Msolve, b, shift, checkA, precon, &
+  //                   x, itnlim, nout, rtol,                      &
+  //                   istop, itn, Anorm, Acond, rnorm, Arnorm, ynorm )
+  //
+  //  integer,  intent(in)    :: n, itnlim, nout
+  //  logical,  intent(in)    :: checkA, precon
+  //  real(dp), intent(in)    :: b(n)
+  //  real(dp), intent(in)    :: shift, rtol
+  //  real(dp), intent(out)   :: x(n)
+  //  integer,  intent(out)   :: istop, itn
+  //  real(dp), intent(out)   :: Anorm, Acond, rnorm, Arnorm, ynorm
+  //
+  //  interface
+  //     subroutine Aprod (n,x,y)                   ! y := A*x
+  //       use       minresDataModule
+  //       integer,  intent(in)    :: n
+  //       real(dp), intent(in)    :: x(n)
+  //       real(dp), intent(out)   :: y(n)
+  //     end subroutine Aprod
+  //
+  //     subroutine Msolve(n,x,y)                   ! Solve M*y = x
+  //       use       minresDataModule
+  //       integer,  intent(in)    :: n
+  //       real(dp), intent(in)    :: x(n)
+  //       real(dp), intent(out)   :: y(n)
+  //     end subroutine Msolve
+  //  end interface
+  //
+  //!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+static void Msolve(int *n, double *x, double *y) {
+  int i;
+  for (i=0; i<*n; ++i) y[i] = x[i];
+}
+
+static void minresf(double **M, double *b, double *phi) {
+  int i, j, k, l, x, y, x2, y2, xl, xh, yl, yh, ind, nbi;
+  int n, itnlimit, nout, istop, itn, checkA, precon;
+  double shift, rtol, Anorm, Acond, rnorm, Arnorm, ynorm;
+  double **a;
+
+  void Aprod(int *n, double *x, double *y) {
+    int i, j;
+    for (i=0; i<*n; ++i) {
+      y[i] = 0.;
+      for (j=0; j<*n; ++j) {
+	y[i] += a[i][j]*x[j];
+      }
+    }
+  }
+
+  n = 2*lblattice.grid[0]*lblattice.grid[1];
+
+  a  = malloc(n*sizeof(*a));
+  *a = calloc(n*n,sizeof(**a));
+  for (i=0; i<n; ++i) a[i] = a[0] + i*n;
+
+  xl = lblattice.halo_size[0];
+  xh = lblattice.halo_size[0] + lblattice.grid[0];
+  yl = lblattice.halo_size[1];
+  yh = lblattice.halo_size[1] + lblattice.grid[1];
+
+  for (x=xl, i=0; x<xh; ++x) {
+    for (y=yl; y<yh; ++y) {
+      ind = 2*(x*lblattice.stride[0]+y);
+      for (j=0; j<lbmodel.n_dim; ++j, ++i) {
+	for (x2=xl, l=0; x2<xh; ++x2) {
+	  for (y2=yl; y2<yh; ++y2) {
+	    nbi = 2*(x2*lblattice.stride[0]+y2);
+	    for (k=0; k<lbmodel.n_dim; ++k, ++l) {
+	      a[i][l] = M[ind+j][nbi+k];
+	    }
+	  }
+	}
+      }
+    }
+  }
+
+  itnlimit = 10000;
+  nout     = 6;
+  checkA   = 1;
+  precon   = 0;
+  shift    = 0.;
+  rtol     = TOLERANCE;
+
+  __minresmodule_MOD_minres(&n, Aprod, Msolve, b, &shift, &checkA, &precon,
+			    phi, &itnlimit, &nout, &rtol,
+			    &istop, &itn,
+			    &Anorm, &Acond, &rnorm, &Arnorm, &ynorm);
+
+}
+
+/***********************************************************************/
+
 #ifdef MKL
 static void mkl_factorise(double **M, double *b, double *phi) {
   int j, x, y, xl, xh, yl, yh, ind;
@@ -764,8 +862,11 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
   memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
   minres(M, b, phi);
 
-  //memcpy(phi_new, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
-  //minres2(M, b, phi_new);
+  //memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
+  //minres2(M, b, phi);
+
+  memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
+  minresf(M, b, phi);
 
   //memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
   //mkl_factorise(M, b, phi);
@@ -804,7 +905,7 @@ static void ic_read(double *dmax, double **M, LB_Moments *m, int x, int y) {
 
   mlb_matrix_current(jc2, M, m, x, y);
 
-  fprintf(stderr, "(%d,%d) jnew = (%.9f,%.9f)\tjmatrix = (%.9f,%.9f)\n",x,y,jnew[0],jnew[1],jc2[0],jc2[1]);
+  //fprintf(stderr, "(%d,%d) jnew = (%.9f,%.9f)\tjmatrix = (%.9f,%.9f)\n",x,y,jnew[0],jnew[1],jc2[0],jc2[1]);
 
   d = fabs(jnew[0] - jc[0]);
   if (d > *dmax) *dmax = d;
