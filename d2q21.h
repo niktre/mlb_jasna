@@ -76,6 +76,7 @@ typedef struct _LBmoments {
   double rd2p;
   double force[NDIM];
   double u[NDIM];
+  double u_old[NDIM];
   double jcorr[NDIM];
 } LB_Moments;
 

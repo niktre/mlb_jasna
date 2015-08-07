@@ -21,6 +21,7 @@
 
 #define GAUSS_SEIDEL
 #define MINRES
+//#define MKL
 
 /***********************************************************************/
 
@@ -82,6 +83,30 @@ static void mlb_calc_current(double *jc, LB_Moments *m, int x, int y) {
 
 /***********************************************************************/
 
+static void mlb_save_vel(double *m0) {
+  int j, x, y, xl, xh, yl, yh, ind;
+  double *m, *u, *u_old;
+  xl = lblattice.halo_size[0];
+  xh = lblattice.halo_size[0] + lblattice.grid[0];
+  yl = lblattice.halo_size[1];
+  yh = lblattice.halo_size[1] + lblattice.grid[1];
+
+  for (x=xl; x<xh; ++x) {
+    for (y=yl; y<yh; ++y) {
+      ind = x*lblattice.stride[0]+y;
+      m = m0 + ind*lbmodel.n_vel;
+      u     = ((LB_Moments *)m)->u;
+      u_old = ((LB_Moments *)m)->u_old;
+      for (j=0; j<lbmodel.n_dim; ++j) {
+	u_old[j] = u[j];
+      }
+    }
+  }
+
+}
+
+/***********************************************************************/
+
 inline static void mlb_matrix_current(double *jc, double **M, LB_Moments *m, int x, int y) {
   int j, k, x2, y2, xl, xh, yl, yh, ind, nbi;
   double rho, *u, *u_nb;
@@ -93,7 +118,7 @@ inline static void mlb_matrix_current(double *jc, double **M, LB_Moments *m, int
 
   ind = 2*(x*lblattice.stride[0] + y);
   rho = m->rho;
-  u   = m->u;
+  u   = m->u_old;
 
   for (j=0; j<lbmodel.n_dim; ++j) {
 
@@ -207,22 +232,22 @@ inline static void mlb_construct_matrix(double **M, double *b, double *m0) {
       ind = 2*(x*lblattice.stride[0]+y);
 
       for (x2=0; x2<lblattice.halo_grid[0]; ++x2) {
-	for (y2=0; y2<lblattice.halo_grid[1]; ++y2) {
+        for (y2=0; y2<lblattice.halo_grid[1]; ++y2) {
 
 	  nbi = 2*(x2*lblattice.stride[0]+y2);
 
 	  if (x2 < xl) {
-	    nbf = 2*(xh-xl+x2)*lblattice.stride[0];
+	    nbf = 2*(x2+(xh-xl))*lblattice.stride[0];
 	  } else if (x2 >= xh) {
-	    nbf = 2*(xl-xh+x2)*lblattice.stride[0];
+	    nbf = 2*(x2-(xh-xl))*lblattice.stride[0];
 	  } else {
 	    nbf = 2*x2*lblattice.stride[0];
 	  }
 
 	  if (y2 < yl) {
-	    nbf += 2*(yh-yl+y2);
+	    nbf += 2*(y2+(yh-yl));
 	  } else if (y2 >= yh) {
-	    nbf += 2*(yl-yh+y2);
+	    nbf += 2*(y2-(yh-yl));
 	  } else {
 	    nbf += 2*y2;
 	  }
@@ -916,6 +941,8 @@ void mlb_correction_current(double *m0) {
   do {
 
     m = m0; dmax = 0.0; ++niter;
+
+    mlb_save_vel(m0);
 
     lb_halo_copy(); /* need up to date currents in halo */
 
