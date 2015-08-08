@@ -272,7 +272,7 @@ inline static void mlb_construct_matrix(double **M, double *b, double *m0) {
 /***********************************************************************/
 
 #ifdef GAUSS_SEIDEL
-static void gauss_seidel(double **M, double *b, double *phi) {
+inline static void gauss_seidel(double **M, double *b, double *phi) {
   int i, j, k, x, y, xl, xh, yl, yh, ind, nbi, niter=0;
   double sigma, d, dmax;
 
@@ -349,7 +349,7 @@ static void gauss_seidel(double **M, double *b, double *phi) {
 /***********************************************************************/
 
 #ifdef MINRES
-static void minres(double **M, double *b, double *phi) {
+inline static void minres(double **M, double *b, double *phi) {
   int j, k, x, y, x2, y2, xl, xh, yl, yh, ind, nbi, niter=0;
   double *ptmp=NULL;
 
@@ -523,7 +523,7 @@ static void minres(double **M, double *b, double *phi) {
 
 /***********************************************************************/
 
-static void minres2(double **M, double *b, double *phi) {
+inline static void minres2(double **M, double *b, double *phi) {
   int j, k, x, y, x2, y2, xl, xh, yl, yh, ind, nbi, niter=0;
   double r2, alfa, beta, beta1, g1, g2, d1, d2, e1, e2, c, s, tau, eta;
   double *ptmp=NULL;
@@ -742,7 +742,7 @@ static void minresf(double **M, double *b, double *phi) {
   }
 
   itnlimit = 10000;
-  nout     = 6;
+  nout     = 6; /* stdout */
   checkA   = 1;
   precon   = 0;
   shift    = 0.;
@@ -851,11 +851,11 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
     }
   }
 
-  memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
-  gauss_seidel(M, b, phi);
+  //memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
+  //gauss_seidel(M, b, phi);
 
-  memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
-  minres(M, b, phi);
+  //memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
+  //minres(M, b, phi);
 
   //memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
   //minres2(M, b, phi);
@@ -1291,3 +1291,194 @@ double eq_state(double rho){
    */
    
 /***********************************************************************/
+
+#if 1
+static void minrestest(int n, int precon, double shift, double pertM, int nout) {
+  int i, j, ind;
+  double *d, x2, r2, w2, e2, etol;
+  double xtrue[n], x[n], y[n], b[n], r[n], w[n];
+
+  void Aprod(int *n, double *x, double *y) {
+    int i;
+    for (i=0; i<*n; ++i) {
+      y[i] = d[i]*x[i];
+    }
+  }
+
+  void Msolve(int *n, double *x, double *y) {
+    int i;
+    double di;
+    for (i=0; i<*n; ++i) {
+      di = fabs( d[i] - shift );
+      if (i%10 == 0) di = di + pertM;
+      if (fabs(di) > 0.) {
+	y[i] = x[i]/di;
+      } else {
+	y[i] = x[i];
+      }
+    }
+  }
+
+  fprintf(stderr, "-----------------------------------------------------\n");
+  fprintf(stderr, "-----------------------------------------------------\n");
+  fprintf(stderr, " Test of  MINRES.\n");
+  fprintf(stderr, "-----------------------------------------------------\n");
+  fprintf(stderr, " shift = %f pertM = %f\n", shift, pertM);
+
+  d = malloc(n*sizeof(*d));
+
+  for (j=0; j<n; ++j) {
+    d[j] = (double)(j+1);
+    d[j] /= (double)n;
+    xtrue[j] = (double)(n-j);
+  }
+
+  Aprod(&n,xtrue,b);
+
+  for (j=0; j<n; ++j) {
+    b[j] -= shift*xtrue[j];
+  }
+
+  double **M  = malloc(lblattice.halo_grid_volume*2*sizeof(*M));
+  double *bb  = calloc(lblattice.halo_grid_volume*2,sizeof(*bb));
+  double *phi = calloc(lblattice.halo_grid_volume*2,sizeof(*phi));
+  *M = calloc(lblattice.halo_grid_volume*2*lblattice.halo_grid_volume*2,sizeof(**M));
+  for (i=0; i<lblattice.halo_grid_volume*2; ++i) {
+    M[i] = M[0] + i*lblattice.halo_grid_volume*2;
+  }
+
+  int itn, itnlimit, istop, checkA;
+  double Anorm, Acond, rnorm, Arnorm, ynorm, rtol;
+
+  checkA = 1;
+  itnlimit = n*2;
+  rtol = 1.e-12;
+
+  __minresmodule_MOD_minres(&n, Aprod, Msolve, b, &shift, &checkA, &precon,
+			    x, &itnlimit, &nout, &rtol, &istop, &itn,
+			    &Anorm, &Acond, &rnorm, &Arnorm, &ynorm);
+
+  fprintf(stderr, " Solution  x = (%f", x[0]);
+  for (j=1; j<3 && j<n; ++j) {
+    fprintf(stderr, ", %f", x[j]);
+  }
+  fprintf(stderr, " ... ");
+  for (j=n-3; j<n; ++j) {
+    fprintf(stderr, ", %f", x[j]);
+  }
+  fprintf(stderr, ")\n");
+
+  Aprod(&n,x,y);
+
+  r2 = 0.;
+  for (j=0; j<n; ++j) {
+    r[j] = b[j] - y[j] + shift*x[j];
+    r2 += r[j]*r[j];
+  }
+  r2 = sqrt(r2);
+  fprintf(stderr, " Final residual = %f\n",r2);
+
+  int x1, y1, xl, xh, yl, yh;
+
+  xl = lblattice.halo_size[0];
+  xh = lblattice.halo_size[0] + lblattice.grid[0];
+  yl = lblattice.halo_size[1];
+  yh = lblattice.halo_size[1] + lblattice.grid[1];
+
+  for (i=0, x1=xl; x1<xh; ++x1) {
+    for (y1=yl; y1<yh; ++y1) {
+      ind = 2*(x1*lblattice.stride[0]+y1);
+      for (j=0; j<lbmodel.n_dim; ++j, ++i) {
+	M[ind+j][ind+j] = d[i];
+	bb[ind+j] = b[i];
+      }
+    }
+  }
+
+  minresf(M, bb, phi);
+
+  for (i=0, x1=xl; x1<xh; ++x1) {
+    for (y1=yl; y1<yh; ++y1) {
+      ind = 2*(x1*lblattice.stride[0]+y1);
+      for (j=0; j<lbmodel.n_dim; ++j, ++i) {
+	x[i] = phi[ind+j];
+      }
+    }
+  }
+
+  fprintf(stderr, " Solution  x = (%f", x[0]);
+  for (j=1; j<3 && j<n; ++j) {
+    fprintf(stderr, ", %f", x[j]);
+  }
+  fprintf(stderr, " ... ");
+  for (j=n-3; j<n; ++j) {
+    fprintf(stderr, ", %f", x[j]);
+  }
+  fprintf(stderr, ")\n");
+
+  Aprod(&n,x,y);
+
+  r2 = 0.;
+  for (j=0; j<n; ++j) {
+    r[j] = b[j] - y[j] + shift*x[j];
+    r2 += r[j]*r[j];
+  }
+  r2 = sqrt(r2);
+  fprintf(stderr, " Final residual = %f\n",r2);
+
+  w2 = x2 = 0.;
+  for (j=0; j<n; ++j) {
+    w[j] = x[j] - xtrue[j];
+    w2 += w[j]*w[j];
+    x2 += xtrue[j]*xtrue[j];
+  }
+  w2 = sqrt(w2);
+  x2 = sqrt(x2);
+  e2 = w2/x2;
+  etol = 1.e-5;
+
+  if (e2 <= etol) {
+    fprintf(stderr, " MINRES  appears to be successful. Relative error in x = %f\n",e2);
+  } else {
+    fprintf(stderr, " MINRES  appears to have failed.   Relative error in x = %f w2 = %f x2 = %f\n",e2,w2,x2);
+  }
+
+  free(d);
+  free(phi);
+  free(bb);
+  free(*M);
+  free(M);
+
+}
+
+/***********************************************************************/
+
+void minrestests() {
+
+  int n, normal, nout;
+  double zero, shift, pertM;
+
+  nout   = 6;
+
+  normal = 0;
+  zero   = 0.0;
+  shift  = 0.25;
+  pertM  = 0.1;
+
+  //n      = 1;
+  //minrestest( n, normal, zero , zero, nout  );
+  //minrestest( n, normal, shift, zero, nout  );
+  //
+  //n      = 2;
+  //minrestest( n, normal, zero , zero, nout  );
+  //minrestest( n, normal, shift, zero, nout  );
+
+  // Minrestest small positive-definite and indefinite systems
+  // without preconditioners.  MINRES should take n iterations.
+
+  n = lblattice.grid[0]*lblattice.grid[1]*2;
+  minrestest( n, normal, zero , zero, nout  );
+  //minrestest( n, normal, shift, pertM, nout  );
+
+}
+#endif

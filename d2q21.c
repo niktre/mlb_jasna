@@ -588,6 +588,8 @@ int main(int argc, char *argv[]) {
 
   lb_init(grid,rho,gamma,kappa); lb_mass_mom(0);
 
+  minrestests();
+
   fprintf(stdout, "Running  %d iterations\n", n_steps); fflush(stdout);
 
   start = (double) clock();
