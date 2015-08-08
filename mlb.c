@@ -17,7 +17,7 @@
 #include "derivFD.h"
 #include "eos.h"
 
-#define TOLERANCE 1.e-3
+#define TOLERANCE 1.e-12
 
 #define GAUSS_SEIDEL
 #define MINRES
@@ -707,12 +707,11 @@ extern void __minresmodule_MOD_minres(int *n,
   //
   //!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-static void minresf(double **M, double *b, double *phi) {
+static void minresf(double **M, double *rhs, double *phi) {
   int i, j, k, l, x1, y1, x2, y2, xl, xh, yl, yh, ind, nbi;
   int n, itnlimit, nout, istop, itn, checkA, precon;
   double shift, rtol, Anorm, Acond, rnorm, Arnorm, ynorm;
-
-  n = 2*lblattice.grid[0]*lblattice.grid[1];
+  double *b, *x;
 
   xl = lblattice.halo_size[0];
   xh = lblattice.halo_size[0] + lblattice.grid[0];
@@ -724,15 +723,16 @@ static void minresf(double **M, double *b, double *phi) {
   }
 
   void Aprod(int *n, double *x, double *y) {
-    for (x1=xl, i=0; x1<xh; ++x1) {
+    for (i=0, x1=xl; x1<xh; ++x1) {
       for (y1=yl; y1<yh; ++y1) {
 	ind = 2*(x1*lblattice.stride[0]+y1);
 	for (j=0; j<lbmodel.n_dim; ++j, ++i) {
-	  for (x2=xl, l=0; x2<xh; ++x2) {
+	  y[i] = 0.;
+	  for (l=0, x2=xl; x2<xh; ++x2) {
 	    for (y2=yl; y2<yh; ++y2) {
 	      nbi = 2*(x2*lblattice.stride[0]+y2);
 	      for (k=0; k<lbmodel.n_dim; ++k, ++l) {
-		y[i] = M[ind+j][nbi+k]*x[l];
+		y[i] += M[ind+j][nbi+k]*x[l];
 	      }
 	    }
 	  }
@@ -741,17 +741,45 @@ static void minresf(double **M, double *b, double *phi) {
     }
   }
 
-  itnlimit = 10000;
+  n = 2*lblattice.grid[0]*lblattice.grid[1];
+
+  b  = calloc(n,sizeof(*b));
+  x  = calloc(n,sizeof(*x));
+
+  /* pack for __minres */
+  for (i=0, x1=xl; x1<xh; ++x1) {
+    for (y1=yl; y1<yh; ++y1) {
+      ind = 2*(x1*lblattice.stride[0]+y1);
+      for (j=0; j<lbmodel.n_dim; ++j, ++i) {
+	x[i] = phi[ind+j];
+	b[i] = rhs[ind+j];
+      }
+    }
+  }
+
+  itnlimit = n*2;
   nout     = 6; /* stdout */
   checkA   = 1;
   precon   = 0;
   shift    = 0.;
   rtol     = TOLERANCE;
 
-  __minresmodule_MOD_minres(&n, Aprod, Msolve, b, &shift, &checkA, &precon,
-			    phi, &itnlimit, &nout, &rtol,
-			    &istop, &itn,
+  __minresmodule_MOD_minres(&n, Aprod, NULL, b, &shift, &checkA, &precon,
+			    x, &itnlimit, &nout, &rtol, &istop, &itn,
 			    &Anorm, &Acond, &rnorm, &Arnorm, &ynorm);
+
+  /* unpack results */
+  for (i=0, x1=xl; x1<xh; ++x1) {
+    for (y1=yl; y1<yh; ++y1) {
+      ind = 2*(x1*lblattice.stride[0]+y1);
+      for (j=0; j<lbmodel.n_dim; ++j, ++i) {
+	phi[ind+j] = x[i];
+      }
+    }
+  }
+
+  free(x);
+  free(b);
 
 }
 
@@ -1295,8 +1323,8 @@ double eq_state(double rho){
 #if 1
 static void minrestest(int n, int precon, double shift, double pertM, int nout) {
   int i, j, ind;
-  double *d, x2, r2, w2, e2, etol;
-  double xtrue[n], x[n], y[n], b[n], r[n], w[n];
+  double *d, xnorm, rnorm, wnorm, enorm, etol;
+  double *xtrue, *x, *y, *b, *r, *w;
 
   void Aprod(int *n, double *x, double *y) {
     int i;
@@ -1326,6 +1354,12 @@ static void minrestest(int n, int precon, double shift, double pertM, int nout) 
   fprintf(stderr, " shift = %f pertM = %f\n", shift, pertM);
 
   d = malloc(n*sizeof(*d));
+  x = malloc(n*sizeof(*x));
+  y = malloc(n*sizeof(*y));
+  b = malloc(n*sizeof(*b));
+  r = malloc(n*sizeof(*r));
+  w = malloc(n*sizeof(*w));
+  xtrue = malloc(n*sizeof(*xtrue));
 
   for (j=0; j<n; ++j) {
     d[j] = (double)(j+1);
@@ -1339,24 +1373,18 @@ static void minrestest(int n, int precon, double shift, double pertM, int nout) 
     b[j] -= shift*xtrue[j];
   }
 
-  double **M  = malloc(lblattice.halo_grid_volume*2*sizeof(*M));
-  double *bb  = calloc(lblattice.halo_grid_volume*2,sizeof(*bb));
-  double *phi = calloc(lblattice.halo_grid_volume*2,sizeof(*phi));
-  *M = calloc(lblattice.halo_grid_volume*2*lblattice.halo_grid_volume*2,sizeof(**M));
-  for (i=0; i<lblattice.halo_grid_volume*2; ++i) {
-    M[i] = M[0] + i*lblattice.halo_grid_volume*2;
-  }
-
   int itn, itnlimit, istop, checkA;
-  double Anorm, Acond, rnorm, Arnorm, ynorm, rtol;
+  double Anorm, Acond, Arnorm, ynorm, rtol;
 
   checkA = 1;
   itnlimit = n*2;
-  rtol = 1.e-12;
+  rtol = TOLERANCE;
 
-  __minresmodule_MOD_minres(&n, Aprod, Msolve, b, &shift, &checkA, &precon,
+#if 1
+  __minresmodule_MOD_minres(&n, Aprod, NULL, b, &shift, &checkA, &precon,
 			    x, &itnlimit, &nout, &rtol, &istop, &itn,
 			    &Anorm, &Acond, &rnorm, &Arnorm, &ynorm);
+#endif
 
   fprintf(stderr, " Solution  x = (%f", x[0]);
   for (j=1; j<3 && j<n; ++j) {
@@ -1370,15 +1398,28 @@ static void minrestest(int n, int precon, double shift, double pertM, int nout) 
 
   Aprod(&n,x,y);
 
-  r2 = 0.;
+  rnorm = 0.;
   for (j=0; j<n; ++j) {
     r[j] = b[j] - y[j] + shift*x[j];
-    r2 += r[j]*r[j];
+    rnorm += r[j]*r[j];
   }
-  r2 = sqrt(r2);
-  fprintf(stderr, " Final residual = %f\n",r2);
+  rnorm = sqrt(rnorm);
+  fprintf(stderr, " Final residual = %f\n",rnorm);
+
+  Aprod(&n,xtrue,b);
+
+  for (j=0; j<n; ++j) {
+    b[j] -= shift*xtrue[j];
+  }
 
   int x1, y1, xl, xh, yl, yh;
+  double **M  = malloc(lblattice.halo_grid_volume*2*sizeof(*M));
+  double *bb  = calloc(lblattice.halo_grid_volume*2,sizeof(*bb));
+  double *phi = calloc(lblattice.halo_grid_volume*2,sizeof(*phi));
+  *M = calloc(lblattice.halo_grid_volume*2*lblattice.halo_grid_volume*2,sizeof(**M));
+  for (i=0; i<lblattice.halo_grid_volume*2; ++i) {
+    M[i] = M[0] + i*lblattice.halo_grid_volume*2;
+  }
 
   xl = lblattice.halo_size[0];
   xh = lblattice.halo_size[0] + lblattice.grid[0];
@@ -1397,11 +1438,20 @@ static void minrestest(int n, int precon, double shift, double pertM, int nout) 
 
   minresf(M, bb, phi);
 
+  int x2, y2, k, l, nbi;
   for (i=0, x1=xl; x1<xh; ++x1) {
     for (y1=yl; y1<yh; ++y1) {
       ind = 2*(x1*lblattice.stride[0]+y1);
       for (j=0; j<lbmodel.n_dim; ++j, ++i) {
 	x[i] = phi[ind+j];
+	for (l=0, x2=xl; x2<xh; ++x2) {
+	  for (y2=yl; y2<yh; ++y2) {
+	    nbi = 2*(x2*lblattice.stride[0]+y2);
+	    for (k=0; k<lbmodel.n_dim; ++k, ++l) {
+	      y[i] = M[ind+j][nbi+k]*phi[nbi+k];
+	    }
+	  }
+	}
       }
     }
   }
@@ -1418,31 +1468,37 @@ static void minrestest(int n, int precon, double shift, double pertM, int nout) 
 
   Aprod(&n,x,y);
 
-  r2 = 0.;
+  rnorm = 0.;
   for (j=0; j<n; ++j) {
     r[j] = b[j] - y[j] + shift*x[j];
-    r2 += r[j]*r[j];
+    rnorm += r[j]*r[j];
   }
-  r2 = sqrt(r2);
-  fprintf(stderr, " Final residual = %f\n",r2);
+  rnorm = sqrt(rnorm);
+  fprintf(stderr, " Final residual = %f\n",rnorm);
 
-  w2 = x2 = 0.;
+  wnorm = xnorm = 0.;
   for (j=0; j<n; ++j) {
     w[j] = x[j] - xtrue[j];
-    w2 += w[j]*w[j];
-    x2 += xtrue[j]*xtrue[j];
+    wnorm += w[j]*w[j];
+    xnorm += xtrue[j]*xtrue[j];
   }
-  w2 = sqrt(w2);
-  x2 = sqrt(x2);
-  e2 = w2/x2;
+  wnorm = sqrt(wnorm);
+  xnorm = sqrt(xnorm);
+  enorm = wnorm/xnorm;
   etol = 1.e-5;
 
-  if (e2 <= etol) {
-    fprintf(stderr, " MINRES  appears to be successful. Relative error in x = %f\n",e2);
+  if (enorm <= etol) {
+    fprintf(stderr, " MINRES  appears to be successful. Relative error in x = %f\n",enorm);
   } else {
-    fprintf(stderr, " MINRES  appears to have failed.   Relative error in x = %f w2 = %f x2 = %f\n",e2,w2,x2);
+    fprintf(stderr, " MINRES  appears to have failed.   Relative error in x = %f wnorm = %f xnorm = %f\n",enorm,wnorm,xnorm);
   }
 
+  free(xtrue);
+  free(w);
+  free(r);
+  free(b);
+  free(y);
+  free(x);
   free(d);
   free(phi);
   free(bb);
