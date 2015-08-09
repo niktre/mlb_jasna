@@ -10,6 +10,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include "lis.h"
 //#include "mkl_service.h"
 //#include "mkl_trans.h"
 //#include "mkl_blas.h"
@@ -664,6 +665,84 @@ inline static void minres2(double **M, double *b, double *phi) {
 
 /***********************************************************************/
 
+static void gmres(double **M, double *rhs, double *phi) {
+  int j, k, x1, y1, x2, y2, xl, xh, yl, yh, ind, nbi;
+  LIS_INT n, i, l, niter;
+  LIS_VECTOR b, x;
+  LIS_MATRIX m;
+  LIS_SOLVER solver;
+
+  xl = lblattice.halo_size[0];
+  xh = lblattice.halo_size[0] + lblattice.grid[0];
+  yl = lblattice.halo_size[1];
+  yh = lblattice.halo_size[1] + lblattice.grid[1];
+
+  n = lblattice.grid[0]*lblattice.grid[1]*2;
+
+  lis_vector_create(0, &b);
+  lis_vector_create(0, &x);
+
+  lis_vector_set_size(x,0,n);
+  lis_vector_set_size(b,0,n);
+
+  lis_matrix_create(0, &m);
+  lis_matrix_set_size(m,0,n);
+
+  /* pack input */
+  for (i=0, x1=xl; x1<xh; ++x1) {
+    for (y1=yl; y1<yh; ++y1) {
+      ind = 2*(x1*lblattice.stride[0]+y1);
+      for (j=0; j<lbmodel.n_dim; ++j, ++i) {
+	lis_vector_set_value(LIS_INS_VALUE, i, phi[ind+j], x);
+	lis_vector_set_value(LIS_INS_VALUE, i, rhs[ind+j], b);
+	for (l=0, x2=xl; x2<xh; ++x2) {
+	  for (y2=yl; y2<yh; ++y2) {
+	    nbi = 2*(x2*lblattice.stride[0]+y2);
+	    for (k=0; k<lbmodel.n_dim; ++k, ++l) {
+	      lis_matrix_set_value(LIS_INS_VALUE, i, l, M[ind+j][nbi+k], m);
+	    }
+	  }
+	}
+      }
+    }
+  }
+
+  lis_matrix_set_type(m, LIS_MATRIX_CSR);
+  lis_matrix_assemble(m);
+
+  lis_solver_create(&solver);
+
+  char options[1024];
+  sprintf(options, "-i gmres -pnone -maxiter %d -tol %e", 2*n, TOLERANCE);
+
+  lis_solver_set_option(options, solver);
+
+  lis_solve(m, b, x, solver);
+
+  lis_solver_get_iter(solver, &niter);
+
+  fprintf(stderr, "LIS %s needed %d iterations.\n", options, niter);
+
+  lis_solver_destroy(solver);
+
+  /* unpack results */
+  for (i=0, x1=xl; x1<xh; ++x1) {
+    for (y1=yl; y1<yh; ++y1) {
+      ind = 2*(x1*lblattice.stride[0]+y1);
+      for (j=0; j<lbmodel.n_dim; ++j, ++i) {
+	lis_vector_get_value(x, i, &phi[ind+j]);
+      }
+    }
+  }
+
+  lis_matrix_destroy(m);
+  lis_vector_destroy(x);
+  lis_vector_destroy(b);
+
+}
+
+/***********************************************************************/
+
 extern void __minresmodule_MOD_minres(int *n,
 				void (*Aprod)(int *n, double *x, double *y),
 				void (*Msolve)(int *n, double *x, double *y),
@@ -889,7 +968,7 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
   //minres2(M, b, phi);
 
   memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
-  minresf(M, b, phi);
+  gmres(M, b, phi);
 
   //memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
   //mkl_factorise(M, b, phi);

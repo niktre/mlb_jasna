@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "lis.h"
 #include "derivFD.h"
 #include "d2q21.h"
 #include "mlb.h"
@@ -573,6 +574,8 @@ int main(int argc, char *argv[]) {
     return -1;
   }	   
 
+  lis_initialize(&argc, &argv);
+
   n_steps = atoi(argv[2]);
 
   grid[0] = 20;
@@ -587,8 +590,6 @@ int main(int argc, char *argv[]) {
   write_eos();
 
   lb_init(grid,rho,gamma,kappa); lb_mass_mom(0);
-
-  minrestests();
 
   fprintf(stdout, "Running  %d iterations\n", n_steps); fflush(stdout);
 
@@ -607,6 +608,8 @@ int main(int argc, char *argv[]) {
   write_profile(1);
 
   lb_finalize();
+
+  lis_finalize();
 
   return EXIT_SUCCESS;
 
