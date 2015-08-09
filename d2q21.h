@@ -37,10 +37,11 @@
 #define VELS(D,Q)    d##D##q##Q##_velocities
 #define WEIGHTS(D,Q) d##D##q##Q##_weights
 #define NORMS(D,Q)   d##D##q##Q##_norms
+#define MIND(D,Q)    d##D##q##Q##_mirror_inds
 #define FDW(D,M)     d##D##q##M##_fd_weights
 /* these macros are necessary to force prescan in the macro below */
 /* because prescan does not occur for stringify and concat */
-#define DnQm(D,Q,M)  { D, Q, VELS(D,Q), M, FDW(D,M) }
+#define DnQm(D,Q,M)  { D, Q, VELS(D,Q), MIND(D,Q), M, FDW(D,M) }
 
 /***********************************************************************/
 
@@ -53,6 +54,7 @@ typedef const struct _LBmodel {
   const int n_dim;
   const int n_vel;
   const double (*c)[NDIM];
+  const int *mirror;
   const int n_fd;
   const double (*fd_weights)[NFD];
 } LB_Model;
@@ -103,6 +105,15 @@ static const double d2q21_velocities[21][2] = { {  0.,  0. },
 						{ -4.,  0. },
 						{  0.,  4. },
 						{  0., -4. } };
+
+/***********************************************************************/
+
+static const int d2q21_mirror_inds[21] = {  0,
+					    2,  1,  4,  3,
+					    6,  5,  8,  7,
+					   10,  9, 12, 11,
+					   14, 13, 16, 15,
+					   18, 17, 20, 19 };
 
 /***********************************************************************/
 
