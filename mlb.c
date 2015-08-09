@@ -274,7 +274,7 @@ inline static void mlb_construct_matrix(double **M, double *b, double *m0) {
 
 #ifdef GAUSS_SEIDEL
 inline static void gauss_seidel(double **M, double *b, double *phi) {
-  int i, j, k, x, y, xl, xh, yl, yh, ind, nbi, niter=0;
+  int j, k, x1, y1, x2, y2, xl, xh, yl, yh, ind, nbi, niter=0;
   double sigma, d, dmax;
 
   xl = lblattice.halo_size[0];
@@ -288,22 +288,20 @@ inline static void gauss_seidel(double **M, double *b, double *phi) {
 
     dmax = 0.0; ++niter;
 
-    for (x=xl; x<xh; ++x) {
-      for (y=yl; y<yh; ++y) {
-	ind = 2*(x*lblattice.stride[0] + y);
+    for (x1=xl; x1<xh; ++x1) {
+      for (y1=yl; y1<yh; ++y1) {
+	ind = 2*(x1*lblattice.stride[0] + y1);
 	for (j=0; j<lbmodel.n_dim; ++j) {
 	  sigma = 0.;
-	  //for (x2=xl; x2<xh; ++x2) {
-	  //  for (y2=yl; y2<yh; ++y2) {
-	  //    nbi = 2*(x2*lblattice.stride[0] + y2);
-	  for (i=0; i<lbmodel.n_fd; ++i) {
-	      nbi = ind + lblattice.nb_offset[i]*2;
+	  for (x2=xl; x2<xh; ++x2) {
+	    for (y2=yl; y2<yh; ++y2) {
+	      nbi = 2*(x2*lblattice.stride[0] + y2);
 	      for (k=0; k<lbmodel.n_dim; ++k) {
 		sigma += M[ind+j][nbi+k]*phi[nbi+k];
 	      }
-	      //}
+	    }
 	  }
-	  //if (fabs(M[ind+i][ind+i]) < 1.e-9) {
+	  //if (fabs(M[ind+i][ind+i]) < 1.e-12) {
 	  //  fprintf(stderr, "Singular matrix (%d,%d)[%d]=%f!\n",x,y,i,M[ind+i][ind+i]);
 	  //}
 	  sigma = (b[ind+j] - sigma)/M[ind+j][ind+j];
@@ -313,32 +311,6 @@ inline static void gauss_seidel(double **M, double *b, double *phi) {
 	}
       }
     }
-
-    //for (x=xl; x<xh; ++x) {
-    //  for (y=yl; y<yh; ++y) {
-    //	ind = 2*(x*lblattice.stride[0] + y);
-    //	for (j=0; j<lbmodel.n_dim; ++j) {
-    //	  phi[ind+j] = phi_new[ind+j];
-    //	}
-    //  }
-    //}
-
-#if 0
-    for (i=il; i<ih; ++i) {
-      sigma = 0.;
-      for (j=il; j<ih; ++j) {
-	sigma += M[i][j]*phi[j];
-      }
-      sigma -= M[i][i]*phi[i]; // subtract i=j contribution from loop above
-      if (fabs(M[i][i]) < 1.e-9) {
-	fprintf(stderr, "Singular matrix (%d,%d)=%f!\n",i,i,M[i][i]);
-      }
-      sigma = (b[i] - sigma)/M[i][i];
-      d = fabs(phi[i] - sigma);
-      if (d > dmax) dmax = d;
-      phi[i] = sigma;
-    }
-#endif
 
   } while (dmax > TOLERANCE);
 
@@ -786,7 +758,7 @@ extern void __minresmodule_MOD_minres(int *n,
   //
   //!+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-static void minresf(double **M, double *rhs, double *phi) {
+inline static void minresf(double **M, double *rhs, double *phi) {
   int i, j, k, l, x1, y1, x2, y2, xl, xh, yl, yh, ind, nbi;
   int n, itnlimit, nout, istop, itn, checkA, precon;
   double shift, rtol, Anorm, Acond, rnorm, Arnorm, ynorm;
@@ -958,20 +930,13 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
     }
   }
 
-  //memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
-  //gauss_seidel(M, b, phi);
+  memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
+  gauss_seidel(M, b, phi);
 
-  //memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
-  //minres(M, b, phi);
-
-  //memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
-  //minres2(M, b, phi);
+  double *ptmp = phi; phi = phi_new; phi_new = ptmp;
 
   memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
   gmres(M, b, phi);
-
-  //memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
-  //mkl_factorise(M, b, phi);
 
   /* copy solution to LB moments */
   m = m0 + lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
@@ -979,7 +944,7 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
     for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
       ind = 2*(x*lblattice.stride[0] + y);
       for (j=0; j<lbmodel.n_dim; ++j) {
-	//fprintf(stderr, "phi[%d] = %f phi_new[%d] = %f u(%d,%d)[%d] = %f\n",ind+j,phi[ind+j],ind+j,phi_new[ind+j],x,y,j,((LB_Moments *)m)->u[j]);
+	fprintf(stderr, "phi[%d] = %f phi_new[%d] = %f u(%d,%d)[%d] = %f\n",ind+j,phi[ind+j],ind+j,phi_new[ind+j],x,y,j,((LB_Moments *)m)->u[j]);
 	double rho = ((LB_Moments *)m)->rho;
 	double *q  = ((LB_Moments *)m)->j;
 	double *u  = ((LB_Moments *)m)->u;
@@ -1399,7 +1364,7 @@ double eq_state(double rho){
    
 /***********************************************************************/
 
-#if 1
+#if 0
 static void minrestest(int n, int precon, double shift, double pertM, int nout) {
   int i, j, ind;
   double *d, xnorm, rnorm, wnorm, enorm, etol;
