@@ -785,11 +785,11 @@ inline static void mlb_calc_sigma(double Sigma[][lbmodel.n_dim], LB_Moments *m) 
 
   /* Step 10 and 11 */
   for (i=0; i<lbmodel.n_dim; ++i) {
-    Dpdu[i] = ( Dp[0] * ( Du[0][i] + Du[i][1] )
+    Dpdu[i] = ( Dp[0] * ( Du[0][i] + Du[i][0] )
 		+ Dp[1] * ( Du[1][i] + Du[i][1] )
 		+ *p * ( D2u[0][0][i] + D2u[1][1][i]
 			 + D2u[i][0][0] + D2u[i][1][1] ) );
-    Dpmrdpdivu[i] = Dpmrdp[i]*divu - *pmrdp*(D2u[0][i][0] + D2u[1][i][1]);
+    Dpmrdpdivu[i] = Dpmrdp[i]*divu + *pmrdp*(D2u[0][i][0] + D2u[1][i][1]);
     for (j=0; j<lbmodel.n_dim; ++j) {
       Drdpudu[i][j] = ( D2p[i][j]/(*rho) - Dr[i]*Dp[j]/(*rho**rho)
 		       + Du[0][i]*Du[j][0] + Du[1][i]*Du[j][1]
