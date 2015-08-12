@@ -22,11 +22,15 @@
 /* constants that define equation of state: p/rho */
 #define A0 (1.2/pow(SCALE,3)) /* specific volume */
 #define S1 0.5                /* reference speed of sound squared */
+#define S2 0.7
 #define R1 (0.5*pow(SCALE,3)) /* densities */
 #define R2 (1.0*pow(SCALE,3))
 #define R3 (2.0*R2-R1)
+#define W 0.05
 
 /***********************************************************************/
+
+#if defined EOS_PSI
 
 static double psi(double rho) {
   return A0*sin(M_PI*(rho-R1)/(R2-R1));
@@ -60,42 +64,6 @@ static double eq_state(double rho) {
 }
 
 /***********************************************************************/
-/*
-static double derS(double rho) {
-  double ds;
-
-  if (rho <= R1 || rho >= R3) {
-    ds = 0.0;
-  } else if (rho < R3) {
-    ds = eq_state(rho)*psi(rho);
-  } else {
-    printf ("I've lost myself in derS!\n");
-    exit (0);
-  }
-
-  return ds;
-  
-}
-*/
-/***********************************************************************/
-/*
-static double der2S(double rho) {
-  double d2s;
-  
-  if (rho <= R1 || rho >= R3) {
-    d2s = 0.0;
-  } else if (rho < R3) {
-    d2s = derS(rho) * psi(rho) + eq_state(rho) * dpsi(rho);
-  } else {
-    printf ("I've lost myself in der2S!\n");
-    exit (0);
-  }
-
-  return d2s;
-
-}
-*/
-/***********************************************************************/
 
 static double derP(double rho) {
   double dp;
@@ -126,6 +94,52 @@ static double der2P(double rho) {
   return d2p;
 
 }
+
+#else
+
+/***********************************************************************/
+
+static double eq_state(double rho) {
+  double cs2;
+
+  cs2 = (S2 - S1) * exp( -(rho-R2)*(rho-R2)/W ) + S1;
+
+  return cs2;
+}
+
+static double derS(double rho) {
+  double ds;
+
+  ds = -2./W*(rho-R2)*(eq_state(rho) - S1);
+
+  return ds;
+}
+
+static double der2S(double rho) {
+  double d2s;
+
+  d2s = -2./W*(eq_state(rho) - S1 + (rho-R2)*derS(rho));
+
+  return d2s;
+}
+
+static double derP(double rho) {
+  double dp;
+
+  dp = eq_state(rho) + rho*derS(rho);
+
+  return dp;
+}
+
+static double der2P(double rho) {
+  double d2p;
+
+  d2p = 2.*derS(rho) + rho*der2S(rho);
+
+  return d2p;
+}
+
+#endif
 
 /***********************************************************************/
 
