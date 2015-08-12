@@ -15,14 +15,14 @@
 #define SCALE (1.0)
 
 /* phase separation densities */
-#define RHO_LOW  (1.1*pow(SCALE,3)) //1.13 //0.577348
+#define RHO_LOW  (1.15*pow(SCALE,3)) //1.13 //0.577348
 #define RHO_HIGH (1.2*pow(SCALE,3)) //1.47 //1.325965
 #define RHO_MEAN ((RHO_LOW+RHO_HIGH)/2.0)
 
 /* constants that define equation of state: p/rho */
 #define A0 (1.2/pow(SCALE,3)) /* specific volume */
-#define S1 0.5                /* reference speed of sound squared */
-#define S2 0.7
+#define S1 0.35               /* reference speed of sound squared */
+#define S2 0.45
 #define R1 (0.5*pow(SCALE,3)) /* densities */
 #define R2 (1.0*pow(SCALE,3))
 #define R3 (2.0*R2-R1)

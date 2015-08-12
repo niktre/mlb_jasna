@@ -506,6 +506,7 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
   gmres(M, b, phi);
 #endif
 
+#if defined GAUSS_SEIDEL || defined GMRES
   /* copy solution to LB moments */
   m = m0 + lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
   for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
@@ -522,6 +523,7 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
       }
     }
   }
+#endif
 
   free(phi);
   free(phi_new);
