@@ -18,10 +18,10 @@
 #include "derivFD.h"
 #include "eos.h"
 
-#define TOLERANCE 1.e-12
+#define TOLERANCE 1.e-6
 
 #define GAUSS_SEIDEL
-#define GMRES
+//#define GMRES
 
 /***********************************************************************/
 
@@ -133,7 +133,7 @@ inline static void mlb_matrix_current(double *jc, double **M, LB_Moments *m, int
 
 	for (k=0; k<lbmodel.n_dim; ++k) {
 
-	  jc[j] += M[ind+j][nbi+k] * u_nb[k];
+	  jc[j] -= M[ind+j][nbi+k] * u_nb[k];
 
 	}
 
@@ -211,14 +211,14 @@ inline static void mlb_construct_matrix(double **M, double *b, double *m0) {
 	  }
 
 	  for (k=0; k<lbmodel.n_dim; ++k) {
-	    M[ind+j][nbi+k] /= -12.;
+	    M[ind+j][nbi+k] /= 12.;
 	  }
 
 	}
 
-	M[ind+j][ind+j] -= *rho;
+	M[ind+j][ind+j] += *rho;
 
-	b[ind+j] = -(q[j] + 0.5*f[j]);
+	b[ind+j] = (q[j] + 0.5*f[j]);
 
       }
 
@@ -425,7 +425,7 @@ static void mkl_factorise(double **M, double *b, double *phi) {
   bb    = mkl_malloc(n*sizeof(*bb),16);
   work  = mkl_malloc(64*n*sizeof(*work),16);
 
-  for (i=0; i<n; ++i) a[i] = a[0] + i*n;
+  for (i=0; i<n; ++i) a[i] = *a + i*n;
 
   int k, x0, y0, x2, y2, nbi;
   for (x0=0, x1=xl; x1<xh; ++x1) {
@@ -499,7 +499,7 @@ static void mlb_solve_matrix(double **M, double *b, double *m0) {
   gauss_seidel(M, b, phi);
 #endif
 
-  double *ptmp = phi; phi = phi_new; phi_new = ptmp;
+  memcpy(phi_new, phi, lblattice.halo_grid_volume*2*sizeof(*phi));
 
 #ifdef GMRES
   memcpy(phi, phi0, lblattice.halo_grid_volume*2*sizeof(*phi));
@@ -659,8 +659,8 @@ void mlb_correction_current(double *m0) {
   int niter = 0;
   double dmax = 0.0;
 
-  double ** M = malloc(lblattice.halo_grid_volume*2*sizeof(*M));
-  double *b   = calloc(lblattice.halo_grid_volume*2,sizeof(*b));
+  double *b  = calloc(lblattice.halo_grid_volume*2,sizeof(*b));
+  double **M = malloc(lblattice.halo_grid_volume*2*sizeof(*M));
   *M = calloc(lblattice.halo_grid_volume*2*lblattice.halo_grid_volume*2,sizeof(**M));
   for (i=0; i<lblattice.halo_grid_volume*2; ++i) {
     M[i] = *M + i*lblattice.halo_grid_volume*2;
@@ -789,7 +789,7 @@ inline static void mlb_calc_sigma(double Sigma[][lbmodel.n_dim], LB_Moments *m) 
 		+ Dp[1] * ( Du[1][i] + Du[i][1] )
 		+ *p * ( D2u[0][0][i] + D2u[1][1][i]
 			 + D2u[i][0][0] + D2u[i][1][1] ) );
-    Dpmrdpdivu[i] = Dpmrdp[i]*divu + *pmrdp*(D2u[0][i][0] + D2u[1][i][1]);
+    Dpmrdpdivu[i] = Dpmrdp[i]*divu + *pmrdp*(D2u[0][0][i] + D2u[1][1][i]);
     for (j=0; j<lbmodel.n_dim; ++j) {
       Drdpudu[i][j] = ( D2p[i][j]/(*rho) - Dr[i]*Dp[j]/(*rho**rho)
 		       + Du[0][i]*Du[j][0] + Du[1][i]*Du[j][1]
@@ -900,7 +900,7 @@ void mlb_correction_collisions(double *f) {
       for (k=0; k<lbmodel.n_dim; ++k) {
 	sc += Sigma[j][k]*(c[i][j]*c[i][k] - cs2 * delta(j,k));
 	for (l=0; l<lbmodel.n_dim; ++l) {
-	  xc += Xi[j][k][l] * ( c[i][j]*c[i][k]*c[i][l] - cs2 * delta(j,k) * c[i][l]- cs2 * delta(k,l) * c[i][j] - cs2 * delta(l,j) * c[i][k] );
+	  xc += Xi[j][k][l] * ( c[i][j]*c[i][k]*c[i][l] - cs2 * delta(j,k) * c[i][l] - cs2 * delta(k,l) * c[i][j] - cs2 * delta(l,j) * c[i][k] );
 	}
       }
     }
