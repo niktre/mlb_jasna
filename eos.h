@@ -12,30 +12,32 @@
 
 #include <stdlib.h>
 
+#define SCALE (1.0)
+
 /* phase separation densities */
-#define RHO_LOW  1.1 //1.13 //0.577348
-#define RHO_HIGH 1.2 //1.47 //1.325965
+#define RHO_LOW  (1.1*pow(SCALE,3)) //1.13 //0.577348
+#define RHO_HIGH (1.2*pow(SCALE,3)) //1.47 //1.325965
 #define RHO_MEAN ((RHO_LOW+RHO_HIGH)/2.0)
 
 /* constants that define equation of state: p/rho */
-#define A  1.2
-#define S1 0.5
-#define R1 0.5
-#define R2 1.0
+#define A0 (1.2/pow(SCALE,3)) /* specific volume */
+#define S1 0.5                /* reference speed of sound squared */
+#define R1 (0.5*pow(SCALE,3)) /* densities */
+#define R2 (1.0*pow(SCALE,3))
 #define R3 (2.0*R2-R1)
 
 /***********************************************************************/
 
 static double psi(double rho) {
-  return A*sin(M_PI*(rho-R1)/(R2-R1));
+  return A0*sin(M_PI*(rho-R1)/(R2-R1));
 }
 
 static double dpsi(double rho) {
-  return A*M_PI/(R2-R1)*cos(M_PI*(rho-R1)/(R2-R1));
+  return A0*M_PI/(R2-R1)*cos(M_PI*(rho-R1)/(R2-R1));
 }
 
 static double intpsi(double rho) {
-  return A*(R2-R1)/M_PI*(1.0 - cos(M_PI*(rho-R1)/(R2-R1)));
+  return A0*(R2-R1)/M_PI*(1.0 - cos(M_PI*(rho-R1)/(R2-R1)));
 }
 
 /***********************************************************************/
