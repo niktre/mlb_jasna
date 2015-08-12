@@ -60,8 +60,6 @@ void secDerAB (double res[lbmodel.n_dim][lbmodel.n_dim], double *m) {
     }
   }
 
-  //fprintf(stderr, "trace=%f\n", res[0][0]+res[1][1]);
-
   secDerAA(&trace, m);
 
   for (j=0; j<lbmodel.n_dim; ++j) {
@@ -114,12 +112,9 @@ void secDer_coeff(double second[lbmodel.n_fd][lbmodel.n_dim][lbmodel.n_dim]) {
   for (i=0; i<lbmodel.n_fd; ++i) {
     for (j=0; j<lbmodel.n_dim; ++j) {
       for (k=0; k<lbmodel.n_dim; ++k) {
-	second[i][j][k] = 0.;
+	second[i][j][k] = tau[2][i] * c[i][j] * c[i][k];
       }
-    }
-    for (j=0; j<lbmodel.n_dim; ++j) {
       for (k=0; k<lbmodel.n_dim; ++k) {
-	second[i][j][k] += tau[2][i] * c[i][j] * c[i][k];
 	second[i][j][j] -= tau[2][i] * c[i][k] * c[i][k]/lbmodel.n_dim;
       }
       second[i][j][j] += tau[1][i]/lbmodel.n_dim;
