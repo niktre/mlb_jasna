@@ -128,23 +128,25 @@ static void lb_calc_moments(double *f) {
   dp  = derP(rho);
   d2p = der2P(rho);
 
+  LB_Moments *lbmom = (LB_Moments *)m;
+
   /* pressure and derivatives */
-  m[6] = p;
-  m[7] = dp;
-  m[8] = p - rho*dp;
-  m[9] = rho*d2p;
+  lbmom->p     = p;
+  lbmom->dp    = dp;
+  lbmom->pmrdp = p - rho*dp;
+  lbmom->rd2p  = rho*d2p;
 
   /* force */
-  m[10] = 0.0;
-  m[11] = 0.0;
+  lbmom->force[0] = 0.0;
+  lbmom->force[1] = 0.0;
 
   /* velocity */
-  m[12] = m[1]/m[0];
-  m[13] = m[2]/m[0];
+  lbmom->u[0] = m[1]/m[0];
+  lbmom->u[1] = m[2]/m[0];
 
   /* correction current */
-  m[14] = 0.0;
-  m[15] = 0.0;
+  //lbmom->jcorr[0] = 0.0;
+  //lbmom->jcorr[1] = 0.0;
 
 }
 
@@ -154,14 +156,13 @@ static void lb_calc_equilibrium(double *f_eq, double *f) {
 
   int i;
   double w[lbmodel.n_vel];
-  double rho, u[lbmodel.n_dim], uc, u2, cs2;
-  double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
+  double rho, *u, uc, u2, cs2;
+  LB_Moments *m = (LB_Moments *)(f + lblattice.halo_grid_volume*lbmodel.n_vel);
 
-  rho  = m[0];
+  rho  = m->rho;
   //u[0] = (m[1] + 0.5*force[0])/rho;
   //u[1] = (m[2] + 0.5*force[1])/rho;
-  u[0] = m[12];
-  u[1] = m[13];
+  u    = m->u; // m + 12
 
   cs2 = eq_state(rho);
   lb_weights(w, cs2);
@@ -386,8 +387,7 @@ static void lb_collide_stream(double *f) {
 
 /***********************************************************************/
 
-static void lb_update() {
-  double *f = lbf;
+static void lb_update(double *f) {
   double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
 
   mlb_correction_current(m);
@@ -494,6 +494,35 @@ void lb_finalize() {
 
 /***********************************************************************/
 
+void lb_mass_mom(int i) {
+  int x, y, xl, xh, yl, yh, xoff;
+  double rho, j[lbmodel.n_dim];
+  double *m = lbf + lblattice.halo_grid_volume*lbmodel.n_vel;
+
+  xl = lblattice.halo_size[0];
+  xh = lblattice.halo_size[0] + lblattice.grid[0];
+  yl = lblattice.halo_size[1];
+  yh = lblattice.halo_size[1] + lblattice.grid[1];
+
+  xoff = lblattice.halo_grid[0] - (xh - xl);
+
+  m += lbmodel.n_vel*(lblattice.stride[0]*xl+yl);
+
+  rho = j[0] = j[1] = 0.0;
+  for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
+    for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
+      rho  += m[0];
+      j[0] += m[1];
+      j[1] += m[2];
+    }
+  }
+
+  fprintf(stderr, "#%d: rho = %f j = (%f,%f)\n", i, rho, j[0], j[1]);
+
+}
+
+/***********************************************************************/
+
 void write_profile(int write_halo) {
   int x, y, xl, xh, yl, yh, xoff;
   double rho, j[lbmodel.n_dim];
@@ -554,13 +583,16 @@ int main(int argc, char *argv[]) {
   gamma = 0.0;
   kappa = atof(argv[1]);
 
-  lb_init(grid,rho,gamma,kappa);
+  write_eos();
+
+  lb_init(grid,rho,gamma,kappa); lb_mass_mom(0);
 
   fprintf(stdout, "Running  %d iterations\n", n_steps); fflush(stdout);
 
   start = (double) clock();
   for (i=0; i<n_steps; ++i) {
-    lb_update();
+    lb_update(lbf);
+    lb_mass_mom(i+1);
   }
   finish = (double) clock();
 
