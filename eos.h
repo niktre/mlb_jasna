@@ -15,18 +15,18 @@
 #define SCALE (1.0)
 
 /* phase separation densities */
-#define RHO_LOW  (1.15*pow(SCALE,3)) //1.13 //0.577348
-#define RHO_HIGH (1.2*pow(SCALE,3)) //1.47 //1.325965
+#define RHO_LOW  (1.1*pow(SCALE,3))
+#define RHO_HIGH (1.15*pow(SCALE,3))
 #define RHO_MEAN ((RHO_LOW+RHO_HIGH)/2.0)
 
 /* constants that define equation of state: p/rho */
 #define A0 (1.2/pow(SCALE,3)) /* specific volume */
 #define S1 0.35               /* reference speed of sound squared */
-#define S2 0.45
+#define S2 0.44
 #define R1 (0.5*pow(SCALE,3)) /* densities */
 #define R2 (1.0*pow(SCALE,3))
 #define R3 (2.0*R2-R1)
-#define W 0.05
+#define W  (0.25*(R3-R2))
 
 /***********************************************************************/
 
@@ -102,7 +102,7 @@ static double der2P(double rho) {
 static double eq_state(double rho) {
   double cs2;
 
-  cs2 = (S2 - S1) * exp( -(rho-R2)*(rho-R2)/W ) + S1;
+  cs2 = (S2 - S1) * exp( -(rho-R2)*(rho-R2)/(2.*W*W) ) + S1;
 
   return cs2;
 }
@@ -110,7 +110,7 @@ static double eq_state(double rho) {
 static double derS(double rho) {
   double ds;
 
-  ds = -2./W*(rho-R2)*(eq_state(rho) - S1);
+  ds = -(rho-R2)*(eq_state(rho) - S1)/(W*W);
 
   return ds;
 }
@@ -118,7 +118,7 @@ static double derS(double rho) {
 static double der2S(double rho) {
   double d2s;
 
-  d2s = -2./W*(eq_state(rho) - S1 + (rho-R2)*derS(rho));
+  d2s = -(eq_state(rho) - S1 + (rho-R2)*derS(rho))/(W*W);
 
   return d2s;
 }
@@ -145,18 +145,19 @@ static double der2P(double rho) {
 
 inline static void write_eos() {
   FILE* file;
-  double rho, cs2, p, dp, d2p;
+  double rho, cs2, p, dp, d2p, psi;
 
   file = fopen("eos.dat", "w");
 
-  for (rho=0.4; rho<=1.6; rho+=0.01) {
+  for (rho=R1; rho<=R3; rho+=(R3-R1)/100) {
 
     cs2 = eq_state(rho);
     p = rho*cs2;
     dp = derP(rho);
     d2p = der2P(rho);
+    psi = derS(rho)/cs2;
 
-    fprintf(file, "%f %f %f %f %f\n", rho, cs2, p, dp, d2p);
+    fprintf(file, "%f %f %f %f %f %f\n", rho, cs2, p, dp, d2p, psi);
 
   }
 
