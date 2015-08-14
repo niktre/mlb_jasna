@@ -402,18 +402,25 @@ static void lb_update(double *f) {
 static void lb_init_fluid() {
   int x, y, i;
   double rho, cs2, w[lbmodel.n_vel];
-  double dx, dy, r2, r0, iw;
+  double dx, dy, rc, re, a, b, iw, cos;
   double *f = lbf;
 
-  iw = 10.0;
-  r0 = 2.0;
+  iw = 5.0;
+  a  = 3.0;
+  b  = 0.2;
 
   for (x=0; x<lblattice.halo_grid[0]; ++x) {
     for (y=0; y<lblattice.halo_grid[1]; ++y, f+=lbmodel.n_vel) {
       dx = (double)(x - lblattice.halo_grid[0]/2);
       dy = (double)(y - lblattice.halo_grid[1]/2);
-      r2 = dx*dx + dy*dy;
-      rho = 0.5*(RHO_HIGH-RHO_LOW)*tanh((r0-sqrt(r2))/iw) + (RHO_HIGH+RHO_LOW)/2;
+      rc = sqrt(dx*dx + dy*dy);
+      if (rc==0.) {
+	cos = 0.;
+      } else {
+	cos = dx/rc;
+      }
+      re = a*b/sqrt(a*a + (b*b-a*a)*cos*cos);
+      rho = 0.5*(RHO_HIGH-RHO_LOW)*tanh((re-rc)/iw) + (RHO_HIGH+RHO_LOW)/2;
       for (i=0; i<lbmodel.n_vel; ++i) {
 	cs2 = eq_state(rho);
 	lb_weights(w, cs2);
