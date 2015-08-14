@@ -155,7 +155,7 @@ inline static void write_eos() {
     p = rho*cs2;
     dp = derP(rho);
     d2p = der2P(rho);
-    psi = derS(rho)/cs2;
+    psi = (derP(rho)/cs2 - 1.)/rho;
 
     fprintf(file, "%f %f %f %f %f %f\n", rho, cs2, p, dp, d2p, psi);
 

@@ -401,25 +401,23 @@ static void lb_update(double *f) {
 
 static void lb_init_fluid() {
   int x, y, i;
-  double  cs2, w[lbmodel.n_vel];
+  double rho, cs2, w[lbmodel.n_vel];
+  double dx, dy, r2, r0, iw;
   double *f = lbf;
-  double rho1, rho2;
 
-  rho1 = RHO_HIGH;
-  rho2 = RHO_LOW;
+  iw = 10.0;
+  r0 = 2.0;
 
   for (x=0; x<lblattice.halo_grid[0]; ++x) {
     for (y=0; y<lblattice.halo_grid[1]; ++y, f+=lbmodel.n_vel) {
+      dx = (double)(x - lblattice.halo_grid[0]/2);
+      dy = (double)(y - lblattice.halo_grid[1]/2);
+      r2 = dx*dx + dy*dy;
+      rho = 0.5*(RHO_HIGH-RHO_LOW)*tanh((r0-sqrt(r2))/iw) + (RHO_HIGH+RHO_LOW)/2;
       for (i=0; i<lbmodel.n_vel; ++i) {
-	if (x<lblattice.halo_grid[0]/2 && y<lblattice.halo_grid[1]/2) {
-	  cs2 = eq_state(rho1);
-	  lb_weights(w, cs2);
-	  f[i] = w[i]*rho1;
-	} else {
-	  cs2 = eq_state(rho2);
-	  lb_weights(w, cs2);
-	  f[i] = w[i]*rho2;
-	}
+	cs2 = eq_state(rho);
+	lb_weights(w, cs2);
+	f[i] = w[i]*rho;
       }
       lb_calc_moments(f);
     }
@@ -597,6 +595,7 @@ int main(int argc, char *argv[]) {
   for (i=0; i<n_steps; ++i) {
     lb_update(lbf);
     lb_mass_mom(i+1);
+    write_profile(0);
   }
   finish = (double) clock();
 
@@ -605,7 +604,7 @@ int main(int argc, char *argv[]) {
 
   fprintf(stdout, "Elapsed time: %.3f s (%.3e MUPS)\n", elapsed, mups); fflush(stdout); 
 
-  write_profile(1);
+  write_profile(0);
 
   lb_finalize();
 
