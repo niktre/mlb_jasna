@@ -407,7 +407,7 @@ static void lb_init_fluid() {
 
   iw = 5.0;
   a  = 3.0;
-  b  = 0.2;
+  b  = 1.0;
 
   for (x=0; x<lblattice.halo_grid[0]; ++x) {
     for (y=0; y<lblattice.halo_grid[1]; ++y, f+=lbmodel.n_vel) {
@@ -415,7 +415,7 @@ static void lb_init_fluid() {
       dy = (double)(y - lblattice.halo_grid[1]/2);
       rc = sqrt(dx*dx + dy*dy);
       if (rc==0.) {
-	cos = 0.;
+	cos = 1.;
       } else {
 	cos = dx/rc;
       }
