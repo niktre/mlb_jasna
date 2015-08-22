@@ -399,15 +399,38 @@ static void lb_update(double *f) {
 
 /***********************************************************************/
 
-static void lb_init_fluid() {
+static void lb_init_interface() {
+  int x, y, i;
+  double rho, cs2, w[lbmodel.n_vel];
+  double dx;
+  double *f = lbf;
+
+  for (x=0; x<lblattice.halo_grid[0]; ++x) {
+    for (y=0; y<lblattice.halo_grid[1]; ++y, f+=lbmodel.n_vel) {
+      dx = (double)(x - lblattice.halo_grid[0]/2);
+      rho = 0.5*(RHO_HIGH-RHO_LOW)*(1.0 + sin(2.*M_PI/lblattice.grid[0]*dx)) + RHO_LOW;
+      for (i=0; i<lbmodel.n_vel; ++i) {
+	cs2 = eq_state(rho);
+	lb_weights(w, cs2);
+	f[i] = w[i]*rho;
+      }
+      lb_calc_moments(f);
+    }
+  }
+
+}
+
+/***********************************************************************/
+
+static void lb_init_droplet() {
   int x, y, i;
   double rho, cs2, w[lbmodel.n_vel];
   double dx, dy, rc, re, a, b, iw, cos;
   double *f = lbf;
 
-  iw = 5.0;
-  a  = 3.0;
-  b  = 1.0;
+  iw = 0.1;//*lblattice.grid[0]/20.0;
+  a  = 5.0;//*lblattice.grid[0]/20.0;
+  b  = 5.0;//*lblattice.grid[0]/20.0;
 
   for (x=0; x<lblattice.halo_grid[0]; ++x) {
     for (y=0; y<lblattice.halo_grid[1]; ++y, f+=lbmodel.n_vel) {
@@ -429,6 +452,20 @@ static void lb_init_fluid() {
       lb_calc_moments(f);
     }
   }
+
+}
+
+/***********************************************************************/
+
+static void lb_init_random() {
+}
+
+/***********************************************************************/
+
+static void lb_init_fluid() {
+
+  lb_init_interface();
+  //lb_init_droplet();
 
 }
 
@@ -502,8 +539,8 @@ void lb_finalize() {
 
 void lb_mass_mom(int i) {
   int x, y, xl, xh, yl, yh, xoff;
-  double rho, j[lbmodel.n_dim];
-  double *m = lbf + lblattice.halo_grid_volume*lbmodel.n_vel;
+  double rho, j[lbmodel.n_dim], j_eff[lbmodel.n_dim];
+  double *u, *m = lbf + lblattice.halo_grid_volume*lbmodel.n_vel;
 
   xl = lblattice.halo_size[0];
   xh = lblattice.halo_size[0] + lblattice.grid[0];
@@ -514,16 +551,19 @@ void lb_mass_mom(int i) {
 
   m += lbmodel.n_vel*(lblattice.stride[0]*xl+yl);
 
-  rho = j[0] = j[1] = 0.0;
+  rho = j[0] = j[1] = j_eff[0] = j_eff[1] = 0.0;
   for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
     for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
       rho  += m[0];
       j[0] += m[1];
       j[1] += m[2];
+      u = ((LB_Moments *)m)->u;
+      j_eff[0] += m[0]*u[0];
+      j_eff[1] += m[0]*u[1];
     }
   }
 
-  fprintf(stderr, "#%d: rho = %f j = (%f,%f)\n", i, rho, j[0], j[1]);
+  fprintf(stderr, "#%d: rho = %f j = (%f,%f) j_eff=(%f,%f)\n", i, rho, j[0], j[1], j_eff[0], j_eff[1]);
 
 }
 
@@ -583,7 +623,7 @@ int main(int argc, char *argv[]) {
 
   n_steps = atoi(argv[2]);
 
-  grid[0] = 20;
+  grid[0] = 100;
   grid[1] = 20;
 
   vol = grid[0]*grid[1];
