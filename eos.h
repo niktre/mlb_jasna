@@ -15,18 +15,23 @@
 #define SCALE (1.0)
 
 /* phase separation densities */
-#define RHO_LOW  (1.1*pow(SCALE,3))
-#define RHO_HIGH (1.15*pow(SCALE,3))
+#define RHO_LOW  (2.5*pow(SCALE,3))
+#define RHO_HIGH (3.5*pow(SCALE,3))
 #define RHO_MEAN ((RHO_LOW+RHO_HIGH)/2.0)
 
 /* constants that define equation of state: p/rho */
-#define A0 (1.2/pow(SCALE,3)) /* specific volume */
+//#define A0 (1.2/pow(SCALE,3)) /* specific volume */
 #define S1 0.35               /* reference speed of sound squared */
 #define S2 0.44
 #define R1 (0.5*pow(SCALE,3)) /* densities */
-#define R2 (1.0*pow(SCALE,3))
+#define R2 (2.5*pow(SCALE,3))
 #define R3 (2.0*R2-R1)
 #define W  (0.25*(R3-R2))
+
+#define EOS_VDW
+#define A0 (9./49.)
+#define B0 (2./21.)
+#define T0 0.55
 
 /***********************************************************************/
 
@@ -95,7 +100,7 @@ static double der2P(double rho) {
 
 }
 
-#else
+#elif defined EOS_GAUSS
 
 /***********************************************************************/
 
@@ -119,6 +124,53 @@ static double der2S(double rho) {
   double d2s;
 
   d2s = -(eq_state(rho) - S1 + (rho-R2)*derS(rho))/(W*W);
+
+  return d2s;
+}
+
+static double derP(double rho) {
+  double dp;
+
+  dp = eq_state(rho) + rho*derS(rho);
+
+  return dp;
+}
+
+static double der2P(double rho) {
+  double d2p;
+
+  d2p = 2.*derS(rho) + rho*der2S(rho);
+
+  return d2p;
+}
+
+#else
+
+/***********************************************************************/
+
+/* van der Waals equation of state */
+
+static double eq_state(double rho) {
+  double cs2;
+
+  cs2= T0/(1.-B0*rho)-A0*rho;
+
+  return cs2;
+
+}
+
+static double derS(double rho) {
+  double ds;
+
+  ds = T0*B0/((1.-B0*rho)*(1.-B0*rho)) - A0;
+
+  return ds;
+}
+
+static double der2S(double rho) {
+  double d2s;
+
+  d2s = 2.*T0*B0*B0/((1.-B0*rho)*(1.-B0*rho)*(1.-B0*rho));
 
   return d2s;
 }
