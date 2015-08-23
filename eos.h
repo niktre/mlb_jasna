@@ -7,6 +7,8 @@
  *
  ***********************************************************************/
 
+#define EOS_VDW
+
 #ifndef EOS_H
 #define EOS_H
 
@@ -19,19 +21,23 @@
 #define RHO_HIGH (3.5*pow(SCALE,3))
 #define RHO_MEAN ((RHO_LOW+RHO_HIGH)/2.0)
 
-/* constants that define equation of state: p/rho */
-//#define A0 (1.2/pow(SCALE,3)) /* specific volume */
-#define S1 0.35               /* reference speed of sound squared */
-#define S2 0.44
 #define R1 (0.5*pow(SCALE,3)) /* densities */
 #define R2 (2.5*pow(SCALE,3))
 #define R3 (2.0*R2-R1)
-#define W  (0.25*(R3-R2))
 
-#define EOS_VDW
+/* constants that define equation of state: p/rho */
+#if defined EOS_PSI || defined EOS_GAUSS
+#define A0 (1.2/pow(SCALE,3)) /* specific volume */
+#define S1 0.35               /* reference speed of sound squared */
+#define S2 0.44
+#define W  (0.25*(R3-R2))
+#endif
+
+#ifdef EOS_VDW
 #define A0 (9./49.)
 #define B0 (2./21.)
 #define T0 0.55
+#endif
 
 /***********************************************************************/
 

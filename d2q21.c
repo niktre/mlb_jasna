@@ -408,7 +408,7 @@ static void lb_init_interface() {
   for (x=0; x<lblattice.halo_grid[0]; ++x) {
     for (y=0; y<lblattice.halo_grid[1]; ++y, f+=lbmodel.n_vel) {
       dx = (double)(x - lblattice.halo_grid[0]/2);
-      rho = 0.5*(RHO_HIGH-RHO_LOW)*(1.0 + sin(2.*M_PI/lblattice.grid[0]*dx)) + RHO_LOW;
+      rho = 0.5*(RHO_HIGH-RHO_LOW)*(1.0 + cos(2.*M_PI/lblattice.grid[0]*dx)) + RHO_LOW;
       for (i=0; i<lbmodel.n_vel; ++i) {
 	cs2 = eq_state(rho);
 	lb_weights(w, cs2);
@@ -422,7 +422,7 @@ static void lb_init_interface() {
 
 /***********************************************************************/
 
-static void lb_init_droplet() {
+inline static void lb_init_droplet() {
   int x, y, i;
   double rho, cs2, w[lbmodel.n_vel];
   double dx, dy, rc, re, a, b, iw, cos;
@@ -457,7 +457,7 @@ static void lb_init_droplet() {
 
 /***********************************************************************/
 
-static void lb_init_random() {
+inline static void lb_init_random() {
 }
 
 /***********************************************************************/
