@@ -44,6 +44,98 @@ static double PFI;
 
 /***********************************************************************/
 
+#define TOLERANCE 1.e-6
+
+void lb_check_halo() {
+  int i, x, y, xt, yt;
+  double *f1, *f2, *m1, *m2;
+
+  /***************
+   * X direction *
+   ***************/
+
+  for (y=0; y<lblattice.halo_grid[1]; ++y) {
+    for (x=0; x<lblattice.halo_size[0]; ++x) {
+      xt = lblattice.grid[0] + x;
+      f1 = lbf + (x*lblattice.stride[0]+y)*lbmodel.n_vel;
+      f2 = lbf + (xt*lblattice.stride[0]+y)*lbmodel.n_vel;
+      m1 = f1 + lblattice.halo_grid_volume*lbmodel.n_vel;
+      m2 = f2 + lblattice.halo_grid_volume*lbmodel.n_vel;
+      for (i=0; i<lbmodel.n_vel; ++i) {
+	if (fabs(f2[i]-f1[i]) > TOLERANCE) {
+	  fprintf(stderr, "f-Halo error at (%d,%d) to (%d,%d) [%d]\n", x, y, xt, y, i);
+	  return;
+	}
+	if (fabs(m2[i]-m1[i]) > TOLERANCE) {
+	  fprintf(stderr, "m-Halo error at (%d,%d) to (%d,%d) [%d]\n", x, y, xt, y, i);
+	  return;
+	}
+      }
+    }
+    for (x=lblattice.grid[0]+lblattice.halo_size[0]; x<lblattice.halo_grid[0]; ++x) {
+      xt = x - lblattice.grid[0];
+      f1 = lbf + (x*lblattice.stride[0]+y)*lbmodel.n_vel;
+      f2 = lbf + (xt*lblattice.stride[0]+y)*lbmodel.n_vel;
+      m1 = f1 + lblattice.halo_grid_volume*lbmodel.n_vel;
+      m2 = f2 + lblattice.halo_grid_volume*lbmodel.n_vel;
+      for (i=0; i<lbmodel.n_vel; ++i) {
+	if (fabs(f2[i]-f1[i]) > TOLERANCE) {
+	  fprintf(stderr, "f-Halo error at (%d,%d) to (%d,%d) [%d]\n", x, y, xt, y, i);
+	  return;
+	}
+	if (fabs(m2[i]-m1[i]) > TOLERANCE) {
+	  fprintf(stderr, "m-Halo error at (%d,%d) to (%d,%d) [%d]\n", x, y, xt, y, i);
+	  return;
+	}
+      }
+    }
+  }
+
+  /***************
+   * Y direction *
+   ***************/
+
+  for (x=0; x<lblattice.halo_grid[0]; ++x) {
+    for (y=0; y<lblattice.halo_size[1]; ++y) {
+      yt = lblattice.grid[1] + y;
+      f1 = lbf + (x*lblattice.stride[0]+y)*lbmodel.n_vel;
+      f2 = lbf + (x*lblattice.stride[0]+yt)*lbmodel.n_vel;
+      m1 = f1 + lblattice.halo_grid_volume*lbmodel.n_vel;
+      m2 = f2 + lblattice.halo_grid_volume*lbmodel.n_vel;
+      for (i=0; i<lbmodel.n_vel; ++i) {
+	if (fabs(f2[i]-f1[i]) > TOLERANCE) {
+	  fprintf(stderr, "f-Halo error at (%d,%d) to (%d,%d) [%d]\n", x, y, x, yt, i);
+	  return;
+	}
+	if (fabs(m2[i]-m1[i]) > TOLERANCE) {
+	  fprintf(stderr, "m-Halo error at (%d,%d) to (%d,%d) [%d]\n", x, y, xt, y, i);
+	  return;
+	}
+      }
+    }
+    for (y=lblattice.grid[1]+lblattice.halo_size[1]; y<lblattice.halo_grid[1]; ++y) {
+      yt = y - lblattice.grid[1];
+      f1 = lbf + (x*lblattice.stride[0]+y)*lbmodel.n_vel;
+      f2 = lbf + (x*lblattice.stride[0]+yt)*lbmodel.n_vel;
+      m1 = f1 + lblattice.halo_grid_volume*lbmodel.n_vel;
+      m2 = f2 + lblattice.halo_grid_volume*lbmodel.n_vel;
+      for (i=0; i<lbmodel.n_vel; ++i) {
+        if (fabs(f2[i]-f1[i]) > TOLERANCE) {
+          fprintf(stderr, "f-Halo error at (%d,%d) to (%d,%d) [%d]\n", x, y, x, yt, i);
+	  return;
+        }
+	if (fabs(m2[i]-m1[i]) > TOLERANCE) {
+	  fprintf(stderr, "m-Halo error at (%d,%d) to (%d,%d) [%d]\n", x, y, xt, y, i);
+	  return;
+	}
+      }
+    }
+  }
+
+}
+
+/***********************************************************************/
+
 void lb_halo_copy() {
 
   int x;
@@ -86,8 +178,9 @@ void lb_halo_copy() {
   for (x=0; x<lblattice.halo_grid[0]; x++) {
 
     /* populations are handled directly in the update loop */
-    /* memcpy(lbf+ldst, lbf+rsrc, size*sizeof(*lbf)); */
-    /* memcpy(lbf+rdst, lbf+lsrc, size*sizeof(*lbf)); */
+    /* but only certain velocity directions??? */
+    memcpy(lbf+ldst, lbf+rsrc, size*sizeof(*lbf));
+    memcpy(lbf+rdst, lbf+lsrc, size*sizeof(*lbf));
 
     /* only copy the modes */
     memcpy(lbf+ldst+totalsize, lbf+rsrc+totalsize, size*sizeof(*lbf));
@@ -104,7 +197,7 @@ void lb_halo_copy() {
 
 /***********************************************************************/
 
-static void lb_calc_moments(double *f) {
+static void lb_calc_local_moments(double *f) {
 
   int i;
   double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
@@ -148,6 +241,29 @@ static void lb_calc_moments(double *f) {
   /* correction current */
   //lbmom->jcorr[0] = 0.0;
   //lbmom->jcorr[1] = 0.0;
+
+}
+
+/***********************************************************************/
+
+void lb_calc_moments() {
+  int x, y, xl, xh, yl, yh, xoff;
+  double *f = lbf;
+
+  xl = lblattice.halo_size[0];
+  xh = lblattice.halo_size[0] + lblattice.grid[0];
+  yl = lblattice.halo_size[1];
+  yh = lblattice.halo_size[1] + lblattice.grid[1];
+
+  xoff = lblattice.stride[0] - (yh - yl);
+
+  f += lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
+
+  for (x=xl; x<xh; ++x, f+=lbmodel.n_vel*xoff) {
+    for (y=yl; y<yh; ++y, f+=lbmodel.n_vel) {
+      lb_calc_local_moments(f);
+    }
+  }
 
 }
 
@@ -327,7 +443,7 @@ static void lb_read(double *f, double PFI, int x, int y) {
 static void lb_write(double *f, double PFI, int x, int y) {
 
   lb_write_back(f, fi, x, y);
-  lb_calc_moments(f);
+  lb_calc_local_moments(f);
 
 }
 
@@ -395,6 +511,8 @@ static void lb_update(double *f) {
 
   lb_collide_stream(f);
 
+  lb_calc_moments();
+
 }
 
 /***********************************************************************/
@@ -414,7 +532,7 @@ static void lb_init_interface() {
 	lb_weights(w, cs2);
 	f[i] = w[i]*rho;
       }
-      lb_calc_moments(f);
+      lb_calc_local_moments(f);
     }
   }
 
@@ -449,7 +567,7 @@ inline static void lb_init_droplet() {
 	lb_weights(w, cs2);
 	f[i] = w[i]*rho;
       }
-      lb_calc_moments(f);
+      lb_calc_local_moments(f);
     }
   }
 
@@ -465,7 +583,6 @@ inline static void lb_init_random() {
 static void lb_init_fluid() {
 
   lb_init_interface();
-  //lb_init_droplet();
 
 }
 

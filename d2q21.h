@@ -158,6 +158,7 @@ LB_Lattice lblattice;
 LB_Parameters lbpar;
 
 void lb_halo_copy();
+void lb_calc_moments();
 
 /***********************************************************************/
 
