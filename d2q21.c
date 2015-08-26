@@ -526,7 +526,7 @@ static void lb_init_interface() {
   for (x=0; x<lblattice.halo_grid[0]; ++x) {
     for (y=0; y<lblattice.halo_grid[1]; ++y, f+=lbmodel.n_vel) {
       dx = (double)(x - lblattice.halo_grid[0]/2);
-      rho = 0.5*(RHO_HIGH-RHO_LOW)*(1.0 + cos(2.*M_PI/lblattice.grid[0]*dx)) + RHO_LOW;
+      rho = 0.5*(RHO_HIGH-RHO_LOW)*(cos(2.*M_PI/lblattice.grid[0]*dx)) + RHO_MEAN;
       for (i=0; i<lbmodel.n_vel; ++i) {
 	cs2 = eq_state(rho);
 	lb_weights(w, cs2);
@@ -686,7 +686,7 @@ void lb_mass_mom(int i) {
 
 /***********************************************************************/
 
-void write_profile(int write_halo) {
+void write_profile(char filename[], int write_halo) {
   int x, y, xl, xh, yl, yh, xoff;
   double rho, j[lbmodel.n_dim], *u;
   double *m = lbf + lblattice.halo_grid_volume*lbmodel.n_vel;
@@ -709,7 +709,7 @@ void write_profile(int write_halo) {
 
   m += lbmodel.n_vel*(lblattice.stride[0]*xl+yl);
 
-  file = fopen("profile.dat","w");
+  file = fopen(filename,"w");
   for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
     for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
       rho  = m[0];
@@ -751,6 +751,9 @@ int main(int argc, char *argv[]) {
 
   write_eos();
 
+  char filename[1024];
+  sprintf(filename, "profile_k%.03f.dat", kappa);
+
   lb_init(grid,rho,gamma,kappa); lb_mass_mom(0);
 
   fprintf(stdout, "Running  %d iterations\n", n_steps); fflush(stdout);
@@ -759,7 +762,7 @@ int main(int argc, char *argv[]) {
   for (i=0; i<n_steps; ++i) {
     lb_update(lbf);
     lb_mass_mom(i+1);
-    write_profile(0);
+    write_profile(filename, 0);
   }
   finish = (double) clock();
 
@@ -768,7 +771,7 @@ int main(int argc, char *argv[]) {
 
   fprintf(stdout, "Elapsed time: %.3f s (%.3e MUPS)\n", elapsed, mups); fflush(stdout); 
 
-  write_profile(0);
+  write_profile(filename, 0);
 
   lb_finalize();
 

@@ -129,6 +129,11 @@ static const double d2q13_fd_weights[][13] = {
 inline static void lb_weights(double *w, double sigma2) {
   int i;
 
+  if (sigma2 < 0.3510760 || sigma2 > 4./3.) {
+    fprintf(stderr, "EOS will lead to negative weights (sigma2 = %f)!\n", sigma2);
+    exit(-1);
+  }
+
   w[ 0] = 1. - 45./2.*sigma2*(7./60. - 7./48.*sigma2 + sigma2*sigma2/16.);
   w[ 1] = sigma2/3.*(32./15. - 4.*sigma2 + 2.*sigma2*sigma2);
   w[ 5] = sigma2*(sigma2/3. - sigma2*sigma2/4.);

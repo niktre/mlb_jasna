@@ -680,9 +680,11 @@ void mlb_correction_current(double *m0) {
 
     m = m0; dmax = 0.0; ++niter;
 
-    mlb_save_vel(m0);
+    //mlb_save_vel(m0);
 
     lb_halo_copy(); /* need up to date currents in halo */
+
+    //lb_check_halo();
 
     //fprintf(stderr, "Starting iteration #%d of implicit algorithm...\n", niter);
 
@@ -713,7 +715,7 @@ void mlb_correction_current(double *m0) {
 
   fprintf(stderr, "Implicit algorithm converged after %d iteration(s).\n", niter);
 
-  mlb_solve_matrix(M, b, m0);
+  //mlb_solve_matrix(M, b, m0);
 
   free(*M);
   free(M);
