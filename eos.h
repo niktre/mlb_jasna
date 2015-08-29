@@ -17,8 +17,8 @@
 #define SCALE (1.0)
 
 /* phase separation densities */
-#define RHO_LOW  (1.078550*pow(SCALE,3))  // 1.078550
-#define RHO_HIGH (1.208302*pow(SCALE,3))  // 1.208302
+#define RHO_LOW  (1.049171*pow(SCALE,3))  // 1.078550
+#define RHO_HIGH (1.248991*pow(SCALE,3))  // 1.208302
 #define RHO_MEAN ((RHO_LOW+RHO_HIGH)/2.0) // 1.143426
 
 #define R1 (0.5*pow(SCALE,3)) /* densities */
@@ -32,8 +32,8 @@
 #endif
 
 #ifdef EOS_GAUSS
-#define S1 0.36               /* reference speed of sound squared */
-#define S2 0.44
+#define S1 0.4               /* baseline speed of sound squared */
+#define S2 0.5
 #define W  (0.25*(R3-R2))
 #endif
 

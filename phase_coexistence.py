@@ -7,7 +7,7 @@
 
 import numpy as np
 import matplotlib as mpl
-import matplotlib.pyplot as plot
+from matplotlib import pyplot as plot, ticker
 from scipy import integrate, optimize, misc
 
 
@@ -25,12 +25,12 @@ mpl.rc(('xtick','ytick'), labelsize=tickfontsize)
 R1 = 0.5
 R2 = 1.0
 R3 = 2.0*R2-R1
-S1 = 0.36
-S2 = 0.44
+S1 = 0.4
+S2 = 0.5
 W  = 0.25*(R2-R1)
 
-Tmin = 0.43
-Tmax = 0.47
+Tmin = 0.4
+Tmax = 0.6
 
 npoints = 100
 delta_rho = (R3-R1)/npoints
@@ -62,7 +62,7 @@ def free_energy(rhomin, rhomax, S2, S1=S1, W=W):
 
 def critical_density(S2, S1=S1, W=W):
     func = lambda x: psi(x, S2, S1, W)
-    res = optimize.minimize_scalar(func)
+    res = optimize.minimize_scalar(func) # may not be exact
     rhocrit = res.x
     return rhocrit
 
@@ -93,8 +93,8 @@ def maxwell_construction(p, S2, S1=S1, W=W):
 if __name__ == '__main__':
 
     fig = plot.figure(figsize=(8.,8.))
-    ax1 = plot.subplot(223)
-    ax2 = plot.subplot(224)
+    ax1 = plot.subplot(224)
+    ax2 = plot.subplot(223)
     ax3 = plot.subplot(221)
     ax4 = plot.subplot(222)
 
@@ -106,12 +106,11 @@ if __name__ == '__main__':
     for T in np.arange(Tmin,Tmax,(Tmax-Tmin)/npoints):
 
         ps = pressure(rs, S2=T) 
-        #es = np.array( [ free_energy(R1,rho,S2=T) for rho in rs ] )
 
-        rhocrit = critical_density(S2=T)
+        #rhocrit = critical_density(S2=T)
         rhomin, rhomax = stability_limits(S2=T)
 
-        pcrit = pressure(rhocrit, S2=T)
+        #pcrit = pressure(rhocrit, S2=T)
         pmin  = pressure(rhomax, S2=T)
         pmax  = pressure(rhomin, S2=T)
     
@@ -132,25 +131,38 @@ if __name__ == '__main__':
             rl.append(rholiquid)
             ts.append(T)
 
-    ax1.plot(1/rs, ps, lw=linewidth)
-    ax1.plot(1/rhos, vps,"o")
-    ax1.plot(1/rs, np.zeros_like(rs)+pv)   
-    
-    ax1.set_xlabel(r'$1/\rho$')
-    ax1.set_ylabel(r'$p(\rho)$')
+    T = S2
+    rhomin, rhomax = stability_limits(S2=T)
+    pmin  = pressure(rhomax, S2=T)
+    pmax  = pressure(rhomin, S2=T)
+    pv    = optimize.bisect(maxwell_construction, pmin, pmax, (T,S1,W))
+    rhos  = np.array(densities(pv, S2=T))
+    vps  = [ pressure(x, S2=T) for x in rhos ]
+    cs    = cs2(rs, S2=T)
+    ps    = pressure(rs, S2=T)
+    psis  = psi(rs, S2=T)
+    #es = np.array( [ free_energy(R1, rho, S2=T) for rho in rs ] )
 
-    ax2.plot(rg,ts,".b")
-    ax2.plot(rl,ts,".b")
+    ax1.plot(rg,ts,".b")
+    ax1.plot(rl,ts,".b")
 
-    ax2.set_xlabel(r'$\rho$')
-    ax2.set_ylabel(r'$A$')
+    ax1.xaxis.set_major_locator(ticker.MultipleLocator(0.1))
+    ax1.set_xlabel(r'$\rho$')
+    ax1.set_ylabel(r'$A$')
+
+    ax2.plot(1/rs, ps, lw=linewidth)
+    ax2.plot(1/rhos, vps,"o")
+    ax2.plot(1/rhos, np.zeros_like(rhos)+pv)
     
-    ax3.plot(rs, cs2(rs, S2=S2), lw=linewidth)
+    ax2.set_xlabel(r'$1/\rho$')
+    ax2.set_ylabel(r'$p(\rho)$')
+
+    ax3.plot(rs, cs, lw=linewidth)
     
     ax3.set_xlabel(r'$\rho$')
     ax3.set_ylabel(r'$c_s^2(\rho)$')
 
-    ax4.plot(rs, psi(rs, S2=S2), lw=linewidth)   
+    ax4.plot(rs, psis, lw=linewidth)
     ax4.plot(rs, 1/rs, "k:", lw=linewidth)
     ax4.plot(rs, -1/rs, "k:", lw=linewidth)
 
