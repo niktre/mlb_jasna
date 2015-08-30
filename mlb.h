@@ -7,6 +7,8 @@
  *
  ***********************************************************************/
 
+#define TOLERANCE 1.e-6
+
 void mlb_calc_force(double *force, double *m, int x, int y);
 
 void mlb_correction_current(double *m);

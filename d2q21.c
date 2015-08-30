@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "lis.h"
 #include "derivFD.h"
 #include "d2q21.h"
 #include "mlb.h"
@@ -40,6 +41,98 @@
 
 static double *lbf = NULL;
 static double PFI;
+
+/***********************************************************************/
+
+#define TOLERANCE 1.e-6
+
+void lb_check_halo() {
+  int i, x, y, xt, yt;
+  double *f1, *f2, *m1, *m2;
+
+  /***************
+   * X direction *
+   ***************/
+
+  for (y=0; y<lblattice.halo_grid[1]; ++y) {
+    for (x=0; x<lblattice.halo_size[0]; ++x) {
+      xt = lblattice.grid[0] + x;
+      f1 = lbf + (x*lblattice.stride[0]+y)*lbmodel.n_vel;
+      f2 = lbf + (xt*lblattice.stride[0]+y)*lbmodel.n_vel;
+      m1 = f1 + lblattice.halo_grid_volume*lbmodel.n_vel;
+      m2 = f2 + lblattice.halo_grid_volume*lbmodel.n_vel;
+      for (i=0; i<lbmodel.n_vel; ++i) {
+	if (fabs(f2[i]-f1[i]) > TOLERANCE) {
+	  fprintf(stderr, "f-Halo error at (%d,%d) to (%d,%d) [%d]\n", x, y, xt, y, i);
+	  return;
+	}
+	if (fabs(m2[i]-m1[i]) > TOLERANCE) {
+	  fprintf(stderr, "m-Halo error at (%d,%d) to (%d,%d) [%d]\n", x, y, xt, y, i);
+	  return;
+	}
+      }
+    }
+    for (x=lblattice.grid[0]+lblattice.halo_size[0]; x<lblattice.halo_grid[0]; ++x) {
+      xt = x - lblattice.grid[0];
+      f1 = lbf + (x*lblattice.stride[0]+y)*lbmodel.n_vel;
+      f2 = lbf + (xt*lblattice.stride[0]+y)*lbmodel.n_vel;
+      m1 = f1 + lblattice.halo_grid_volume*lbmodel.n_vel;
+      m2 = f2 + lblattice.halo_grid_volume*lbmodel.n_vel;
+      for (i=0; i<lbmodel.n_vel; ++i) {
+	if (fabs(f2[i]-f1[i]) > TOLERANCE) {
+	  fprintf(stderr, "f-Halo error at (%d,%d) to (%d,%d) [%d]\n", x, y, xt, y, i);
+	  return;
+	}
+	if (fabs(m2[i]-m1[i]) > TOLERANCE) {
+	  fprintf(stderr, "m-Halo error at (%d,%d) to (%d,%d) [%d]\n", x, y, xt, y, i);
+	  return;
+	}
+      }
+    }
+  }
+
+  /***************
+   * Y direction *
+   ***************/
+
+  for (x=0; x<lblattice.halo_grid[0]; ++x) {
+    for (y=0; y<lblattice.halo_size[1]; ++y) {
+      yt = lblattice.grid[1] + y;
+      f1 = lbf + (x*lblattice.stride[0]+y)*lbmodel.n_vel;
+      f2 = lbf + (x*lblattice.stride[0]+yt)*lbmodel.n_vel;
+      m1 = f1 + lblattice.halo_grid_volume*lbmodel.n_vel;
+      m2 = f2 + lblattice.halo_grid_volume*lbmodel.n_vel;
+      for (i=0; i<lbmodel.n_vel; ++i) {
+	if (fabs(f2[i]-f1[i]) > TOLERANCE) {
+	  fprintf(stderr, "f-Halo error at (%d,%d) to (%d,%d) [%d]\n", x, y, x, yt, i);
+	  return;
+	}
+	if (fabs(m2[i]-m1[i]) > TOLERANCE) {
+	  fprintf(stderr, "m-Halo error at (%d,%d) to (%d,%d) [%d]\n", x, y, xt, y, i);
+	  return;
+	}
+      }
+    }
+    for (y=lblattice.grid[1]+lblattice.halo_size[1]; y<lblattice.halo_grid[1]; ++y) {
+      yt = y - lblattice.grid[1];
+      f1 = lbf + (x*lblattice.stride[0]+y)*lbmodel.n_vel;
+      f2 = lbf + (x*lblattice.stride[0]+yt)*lbmodel.n_vel;
+      m1 = f1 + lblattice.halo_grid_volume*lbmodel.n_vel;
+      m2 = f2 + lblattice.halo_grid_volume*lbmodel.n_vel;
+      for (i=0; i<lbmodel.n_vel; ++i) {
+        if (fabs(f2[i]-f1[i]) > TOLERANCE) {
+          fprintf(stderr, "f-Halo error at (%d,%d) to (%d,%d) [%d]\n", x, y, x, yt, i);
+	  return;
+        }
+	if (fabs(m2[i]-m1[i]) > TOLERANCE) {
+	  fprintf(stderr, "m-Halo error at (%d,%d) to (%d,%d) [%d]\n", x, y, xt, y, i);
+	  return;
+	}
+      }
+    }
+  }
+
+}
 
 /***********************************************************************/
 
@@ -85,8 +178,9 @@ void lb_halo_copy() {
   for (x=0; x<lblattice.halo_grid[0]; x++) {
 
     /* populations are handled directly in the update loop */
-    /* memcpy(lbf+ldst, lbf+rsrc, size*sizeof(*lbf)); */
-    /* memcpy(lbf+rdst, lbf+lsrc, size*sizeof(*lbf)); */
+    /* but only certain velocity directions??? */
+    memcpy(lbf+ldst, lbf+rsrc, size*sizeof(*lbf));
+    memcpy(lbf+rdst, lbf+lsrc, size*sizeof(*lbf));
 
     /* only copy the modes */
     memcpy(lbf+ldst+totalsize, lbf+rsrc+totalsize, size*sizeof(*lbf));
@@ -103,7 +197,7 @@ void lb_halo_copy() {
 
 /***********************************************************************/
 
-static void lb_calc_moments(double *f) {
+static void lb_calc_local_moments(double *f) {
 
   int i;
   double *m = f + lblattice.halo_grid_volume*lbmodel.n_vel;
@@ -147,6 +241,29 @@ static void lb_calc_moments(double *f) {
   /* correction current */
   //lbmom->jcorr[0] = 0.0;
   //lbmom->jcorr[1] = 0.0;
+
+}
+
+/***********************************************************************/
+
+void lb_calc_moments() {
+  int x, y, xl, xh, yl, yh, xoff;
+  double *f = lbf;
+
+  xl = lblattice.halo_size[0];
+  xh = lblattice.halo_size[0] + lblattice.grid[0];
+  yl = lblattice.halo_size[1];
+  yh = lblattice.halo_size[1] + lblattice.grid[1];
+
+  xoff = lblattice.stride[0] - (yh - yl);
+
+  f += lbmodel.n_vel*(xl*lblattice.stride[0]+yl);
+
+  for (x=xl; x<xh; ++x, f+=lbmodel.n_vel*xoff) {
+    for (y=yl; y<yh; ++y, f+=lbmodel.n_vel) {
+      lb_calc_local_moments(f);
+    }
+  }
 
 }
 
@@ -326,7 +443,7 @@ static void lb_read(double *f, double PFI, int x, int y) {
 static void lb_write(double *f, double PFI, int x, int y) {
 
   lb_write_back(f, fi, x, y);
-  lb_calc_moments(f);
+  lb_calc_local_moments(f);
 
 }
 
@@ -394,35 +511,78 @@ static void lb_update(double *f) {
 
   lb_collide_stream(f);
 
+  lb_calc_moments();
+
+}
+
+/***********************************************************************/
+
+static void lb_init_interface() {
+  int x, y, i;
+  double rho, cs2, w[lbmodel.n_vel];
+  double dx;
+  double *f = lbf;
+
+  for (x=0; x<lblattice.halo_grid[0]; ++x) {
+    for (y=0; y<lblattice.halo_grid[1]; ++y, f+=lbmodel.n_vel) {
+      dx = (double)(x - lblattice.halo_grid[0]/2);
+      rho = 0.5*(RHO_HIGH-RHO_LOW)*(cos(2.*M_PI/lblattice.grid[0]*dx)) + RHO_MEAN;
+      for (i=0; i<lbmodel.n_vel; ++i) {
+	cs2 = eq_state(rho);
+	lb_weights(w, cs2);
+	f[i] = w[i]*rho;
+      }
+      lb_calc_local_moments(f);
+    }
+  }
+
+}
+
+/***********************************************************************/
+
+inline static void lb_init_droplet() {
+  int x, y, i;
+  double rho, cs2, w[lbmodel.n_vel];
+  double dx, dy, rc, re, a, b, iw, cos;
+  double *f = lbf;
+
+  iw = 0.1;//*lblattice.grid[0]/20.0;
+  a  = 5.0;//*lblattice.grid[0]/20.0;
+  b  = 5.0;//*lblattice.grid[0]/20.0;
+
+  for (x=0; x<lblattice.halo_grid[0]; ++x) {
+    for (y=0; y<lblattice.halo_grid[1]; ++y, f+=lbmodel.n_vel) {
+      dx = (double)(x - lblattice.halo_grid[0]/2);
+      dy = (double)(y - lblattice.halo_grid[1]/2);
+      rc = sqrt(dx*dx + dy*dy);
+      if (rc==0.) {
+	cos = 1.;
+      } else {
+	cos = dx/rc;
+      }
+      re = a*b/sqrt(a*a + (b*b-a*a)*cos*cos);
+      rho = 0.5*(RHO_HIGH-RHO_LOW)*tanh((re-rc)/iw) + (RHO_HIGH+RHO_LOW)/2;
+      for (i=0; i<lbmodel.n_vel; ++i) {
+	cs2 = eq_state(rho);
+	lb_weights(w, cs2);
+	f[i] = w[i]*rho;
+      }
+      lb_calc_local_moments(f);
+    }
+  }
+
+}
+
+/***********************************************************************/
+
+inline static void lb_init_random() {
 }
 
 /***********************************************************************/
 
 static void lb_init_fluid() {
-  int x, y, i;
-  double  cs2, w[lbmodel.n_vel];
-  double *f = lbf;
-  double rho1, rho2;
 
-  rho1 = RHO_HIGH;
-  rho2 = RHO_LOW;
-
-  for (x=0; x<lblattice.halo_grid[0]; ++x) {
-    for (y=0; y<lblattice.halo_grid[1]; ++y, f+=lbmodel.n_vel) {
-      for (i=0; i<lbmodel.n_vel; ++i) {
-	if (x<lblattice.halo_grid[0]/2 && y<lblattice.halo_grid[1]/2) {
-	  cs2 = eq_state(rho1);
-	  lb_weights(w, cs2);
-	  f[i] = w[i]*rho1;
-	} else {
-	  cs2 = eq_state(rho2);
-	  lb_weights(w, cs2);
-	  f[i] = w[i]*rho2;
-	}
-      }
-      lb_calc_moments(f);
-    }
-  }
+  lb_init_interface();
 
 }
 
@@ -451,7 +611,7 @@ static void lb_init_lattice(int *grid) {
     for (x=0; x<WGRID; ++x) {
       FI(i,x) = calloc(lblattice.halo_grid[1],sizeof(*FI(0,0)));
     }
-    lblattice.nb_offset[i] = (int)lbmodel.c[i][0]*hgrid[1]+(int)lbmodel.c[i][1];
+    lblattice.nb_offset[i] = (int)(lbmodel.c[i][0])*hgrid[1]+(int)(lbmodel.c[i][1]);
   }
 
 }
@@ -496,36 +656,39 @@ void lb_finalize() {
 
 void lb_mass_mom(int i) {
   int x, y, xl, xh, yl, yh, xoff;
-  double rho, j[lbmodel.n_dim];
-  double *m = lbf + lblattice.halo_grid_volume*lbmodel.n_vel;
+  double rho, j[lbmodel.n_dim], j_eff[lbmodel.n_dim];
+  double *u, *m = lbf + lblattice.halo_grid_volume*lbmodel.n_vel;
 
   xl = lblattice.halo_size[0];
   xh = lblattice.halo_size[0] + lblattice.grid[0];
   yl = lblattice.halo_size[1];
   yh = lblattice.halo_size[1] + lblattice.grid[1];
 
-  xoff = lblattice.halo_grid[0] - (xh - xl);
+  xoff = lblattice.stride[0] - (yh - yl);
 
   m += lbmodel.n_vel*(lblattice.stride[0]*xl+yl);
 
-  rho = j[0] = j[1] = 0.0;
+  rho = j[0] = j[1] = j_eff[0] = j_eff[1] = 0.0;
   for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
     for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
       rho  += m[0];
       j[0] += m[1];
       j[1] += m[2];
+      u = ((LB_Moments *)m)->u;
+      j_eff[0] += m[0]*u[0];
+      j_eff[1] += m[0]*u[1];
     }
   }
 
-  fprintf(stderr, "#%d: rho = %f j = (%f,%f)\n", i, rho, j[0], j[1]);
+  fprintf(stderr, "#%d: rho = %f j = (%f,%f) j_eff=(%f,%f)\n", i, rho, j[0], j[1], j_eff[0], j_eff[1]);
 
 }
 
 /***********************************************************************/
 
-void write_profile(int write_halo) {
+void write_profile(char filename[], int write_halo) {
   int x, y, xl, xh, yl, yh, xoff;
-  double rho, j[lbmodel.n_dim];
+  double rho, j[lbmodel.n_dim], *u;
   double *m = lbf + lblattice.halo_grid_volume*lbmodel.n_vel;
   FILE *file;
 
@@ -542,17 +705,18 @@ void write_profile(int write_halo) {
     yh = lblattice.halo_size[1] + lblattice.grid[1];
   }
 
-  xoff = lblattice.halo_grid[0] - (xh - xl);
+  xoff = lblattice.stride[0] - (yh - yl);
 
   m += lbmodel.n_vel*(lblattice.stride[0]*xl+yl);
 
-  file = fopen("profile.dat","w");
+  file = fopen(filename,"w");
   for (x=xl; x<xh; ++x, m+=lbmodel.n_vel*xoff) {
     for (y=yl; y<yh; ++y, m+=lbmodel.n_vel) {
       rho  = m[0];
       j[0] = m[1];
       j[1] = m[2];
-      fprintf(file,"%f %f %f %f\n",(double)x-xl,(double)y-yl,rho,j[0]/rho);
+      u = ((LB_Moments *)m)->u;
+      fprintf(file,"%f %f %f %f %f %f %f\n",(double)x-xl,(double)y-yl,rho,j[0]/rho,j[1]/rho,u[0],u[1]);
     }
   }
   fclose(file);
@@ -572,9 +736,11 @@ int main(int argc, char *argv[]) {
     return -1;
   }	   
 
+  lis_initialize(&argc, &argv);
+
   n_steps = atoi(argv[2]);
 
-  grid[0] = 20;
+  grid[0] = 100;
   grid[1] = 20;
 
   vol = grid[0]*grid[1];
@@ -585,6 +751,9 @@ int main(int argc, char *argv[]) {
 
   write_eos();
 
+  char filename[1024];
+  sprintf(filename, "profile_k%.03f.dat", kappa);
+
   lb_init(grid,rho,gamma,kappa); lb_mass_mom(0);
 
   fprintf(stdout, "Running  %d iterations\n", n_steps); fflush(stdout);
@@ -593,6 +762,7 @@ int main(int argc, char *argv[]) {
   for (i=0; i<n_steps; ++i) {
     lb_update(lbf);
     lb_mass_mom(i+1);
+    write_profile(filename, 0);
   }
   finish = (double) clock();
 
@@ -601,9 +771,11 @@ int main(int argc, char *argv[]) {
 
   fprintf(stdout, "Elapsed time: %.3f s (%.3e MUPS)\n", elapsed, mups); fflush(stdout); 
 
-  write_profile(0);
+  write_profile(filename, 0);
 
   lb_finalize();
+
+  lis_finalize();
 
   return EXIT_SUCCESS;
 

@@ -37,10 +37,11 @@
 #define VELS(D,Q)    d##D##q##Q##_velocities
 #define WEIGHTS(D,Q) d##D##q##Q##_weights
 #define NORMS(D,Q)   d##D##q##Q##_norms
+#define MIND(D,Q)    d##D##q##Q##_mirror_inds
 #define FDW(D,M)     d##D##q##M##_fd_weights
 /* these macros are necessary to force prescan in the macro below */
 /* because prescan does not occur for stringify and concat */
-#define DnQm(D,Q,M)  { D, Q, VELS(D,Q), M, FDW(D,M) }
+#define DnQm(D,Q,M)  { D, Q, VELS(D,Q), MIND(D,Q), M, FDW(D,M) }
 
 /***********************************************************************/
 
@@ -53,6 +54,7 @@ typedef const struct _LBmodel {
   const int n_dim;
   const int n_vel;
   const double (*c)[NDIM];
+  const int *mirror;
   const int n_fd;
   const double (*fd_weights)[NFD];
 } LB_Model;
@@ -76,6 +78,7 @@ typedef struct _LBmoments {
   double rd2p;
   double force[NDIM];
   double u[NDIM];
+  double u_old[NDIM];
   double jcorr[NDIM];
 } LB_Moments;
 
@@ -105,6 +108,15 @@ static const double d2q21_velocities[21][2] = { {  0.,  0. },
 
 /***********************************************************************/
 
+static const int d2q21_mirror_inds[21] = {  0,
+					    2,  1,  4,  3,
+					    6,  5,  8,  7,
+					   10,  9, 12, 11,
+					   14, 13, 16, 15,
+					   18, 17, 20, 19 };
+
+/***********************************************************************/
+
 static const double d2q13_fd_weights[][13] = {
   { 0., 2./3., 2./3., 2./3., 2./3., 0., 0., 0., 0., -1./24., -1./24., -1./24., -1./24. },
   { -4., 1., 1., 1., 1., 0., 0., 0., 0., 0., 0., 0., 0. },
@@ -116,6 +128,11 @@ static const double d2q13_fd_weights[][13] = {
 
 inline static void lb_weights(double *w, double sigma2) {
   int i;
+
+  if (sigma2 < 0.3510760 || sigma2 > 4./3.) {
+    fprintf(stderr, "EOS will lead to negative weights (sigma2 = %f)!\n", sigma2);
+    exit(-1);
+  }
 
   w[ 0] = 1. - 45./2.*sigma2*(7./60. - 7./48.*sigma2 + sigma2*sigma2/16.);
   w[ 1] = sigma2/3.*(32./15. - 4.*sigma2 + 2.*sigma2*sigma2);
@@ -132,7 +149,8 @@ inline static void lb_weights(double *w, double sigma2) {
     w[17+i] = w[17];
   }
 
-  //fprintf(stderr, "cs2=%f w=(%f,%f,%f,%f,%f,%f)\n", sigma2, w[0],w[1],w[5],w[9],w[13],w[17]);
+  //double sum = w[0]+4.*(w[1]+w[5]+w[9]+w[13]+w[17]);
+  //fprintf(stderr, "cs2=%f w=(%f,%f,%f,%f,%f,%f) sum=%f\n", sigma2, w[0],w[1],w[5],w[9],w[13],w[17],sum);
 
 }
 
@@ -145,6 +163,7 @@ LB_Lattice lblattice;
 LB_Parameters lbpar;
 
 void lb_halo_copy();
+void lb_calc_moments();
 
 /***********************************************************************/
 

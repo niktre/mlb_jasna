@@ -4,7 +4,11 @@ CLEANNAME = clean
 
 CC = gcc
 CFLAGS += -Wall
-LFLAGS += -lm
+LDFLAGS += -lm -lgfortran -lgomp -llis
+
+ifeq ($(CC),icc)
+  CFLAGS += -openmp
+endif
 
 HEADERS = eos.h mlb.h d2q21.h derivFD.h defs.h
 
@@ -22,6 +26,6 @@ $(CLEANNAME):
 		$(RM) -f $(FILES)
 
 $(NAME):	$(OBJECT)
-		$(CC) -o $@ $(CFLAGS) $(OBJECT) $(LFLAGS)
+		$(CC) -o $@ $(CFLAGS) $^ $(LDFLAGS)
 
 $(OBJECT): $(HEADERS)
